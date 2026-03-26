@@ -2748,10 +2748,16 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
           ...(fastMode ? { fastMode: true } : {}),
         };
 
+        const effectiveModel =
+          modelSelection?.model === "claude-opus-4-6" ||
+          modelSelection?.model === "claude-sonnet-4-6"
+            ? `${modelSelection.model}[1m]`
+            : modelSelection?.model;
+
         const queryOptions: ClaudeQueryOptions = {
           ...(input.cwd ? { cwd: input.cwd } : {}),
-          ...(apiModelId ? { model: apiModelId } : {}),
-          pathToClaudeCodeExecutable: claudeBinaryPath,
+          ...(effectiveModel ? { model: effectiveModel } : {}),
+          pathToClaudeCodeExecutable: providerOptions?.binaryPath ?? "claude",
           settingSources: [...CLAUDE_SETTING_SOURCES],
           ...(effectiveEffort ? { effort: effectiveEffort } : {}),
           ...(permissionMode ? { permissionMode } : {}),

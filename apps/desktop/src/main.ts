@@ -30,6 +30,7 @@ import { RotatingFileSink } from "@t3tools/shared/logging";
 import { showDesktopConfirmDialog } from "./confirmDialog";
 import { syncShellEnvironment } from "./syncShellEnvironment";
 import { getAutoUpdateDisabledReason, shouldBroadcastDownloadProgress } from "./updateState";
+import { getPlatformWindowChromeOptions } from "./windowOptions";
 import {
   createInitialDesktopUpdateState,
   reduceDesktopUpdateStateOnCheckFailure,
@@ -1255,8 +1256,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     ...getIconOption(),
     title: APP_DISPLAY_NAME,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 18 },
+    ...getPlatformWindowChromeOptions(process.platform),
     webPreferences: {
       preload: Path.join(__dirname, "preload.js"),
       contextIsolation: true,
