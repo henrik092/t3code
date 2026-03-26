@@ -117,6 +117,7 @@ function resolveBaseDir(baseDir: string | undefined): Effect.Effect<string, neve
 interface CreateDevRunnerEnvInput {
   readonly mode: DevMode;
   readonly baseEnv: NodeJS.ProcessEnv;
+  readonly cwd: string | undefined;
   readonly serverOffset: number;
   readonly webOffset: number;
   readonly t3Home: string | undefined;
@@ -132,6 +133,7 @@ interface CreateDevRunnerEnvInput {
 export function createDevRunnerEnv({
   mode,
   baseEnv,
+  cwd,
   serverOffset,
   webOffset,
   t3Home,
@@ -144,13 +146,17 @@ export function createDevRunnerEnv({
   devUrl,
 }: CreateDevRunnerEnvInput): Effect.Effect<NodeJS.ProcessEnv, never, Path.Path> {
   return Effect.gen(function* () {
+    const path = yield* Path.Path;
     const serverPort = port ?? BASE_SERVER_PORT + serverOffset;
     const webPort = BASE_WEB_PORT + webOffset;
     const resolvedBaseDir = yield* resolveBaseDir(t3Home);
     const isDesktopMode = mode === "dev:desktop";
+    const resolvedCwd = path.resolve(cwd?.trim() || baseEnv.T3CODE_CWD?.trim() || process.cwd());
 
     const output: NodeJS.ProcessEnv = {
       ...baseEnv,
+      T3CODE_PORT: String(serverPort),
+      T3CODE_CWD: resolvedCwd,
       PORT: String(webPort),
       ELECTRON_RENDERER_PORT: String(webPort),
       VITE_DEV_SERVER_URL: devUrl?.toString() ?? `http://localhost:${webPort}`,
@@ -187,6 +193,8 @@ export function createDevRunnerEnv({
 
     if (autoBootstrapProjectFromCwd !== undefined) {
       output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD = autoBootstrapProjectFromCwd ? "1" : "0";
+    } else if (mode === "dev:desktop" && !output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD) {
+      output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD = "1";
     } else {
       delete output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD;
     }
@@ -427,6 +435,7 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
     const env = yield* createDevRunnerEnv({
       mode: input.mode,
       baseEnv: process.env,
+      cwd: process.cwd(),
       serverOffset,
       webOffset,
       t3Home: input.t3Home,

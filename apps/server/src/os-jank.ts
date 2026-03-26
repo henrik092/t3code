@@ -34,3 +34,11 @@ export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
   }
   return resolve(yield* expandHomePath(raw.trim()));
 });
+
+export const resolveCwd = Effect.fn(function* (raw: string | undefined, fallback: string) {
+  const { resolve } = yield* Path.Path;
+  if (!raw || raw.trim().length === 0) {
+    return resolve(fallback);
+  }
+  return resolve(yield* expandHomePath(raw.trim()));
+});

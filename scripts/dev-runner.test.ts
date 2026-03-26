@@ -51,6 +51,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
+          cwd: "/tmp/dev-workspace",
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
@@ -72,6 +73,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev:server",
           baseEnv: {},
+          cwd: "/tmp/override-workspace",
           serverOffset: 0,
           webOffset: 0,
           t3Home: "/tmp/custom-t3",
@@ -85,6 +87,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         });
 
         assert.equal(env.T3CODE_HOME, resolve("/tmp/custom-t3"));
+        assert.equal(env.T3CODE_CWD, resolve("/tmp/override-workspace"));
         assert.equal(env.T3CODE_PORT, "4222");
         assert.equal(env.VITE_WS_URL, "ws://localhost:4222");
         assert.equal(env.T3CODE_NO_BROWSER, "1");
@@ -102,6 +105,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           baseEnv: {
             T3CODE_LOG_WS_EVENTS: "keep-me-out",
           },
+          cwd: "/tmp/dev-workspace",
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
@@ -124,6 +128,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
+          cwd: "/tmp/dev-workspace",
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
@@ -145,6 +150,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
+          cwd: "/tmp/dev-workspace",
           serverOffset: 0,
           webOffset: 0,
           t3Home: "/tmp/my-t3",
@@ -195,6 +201,29 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(env.T3CODE_NO_BROWSER, undefined);
         assert.equal(env.T3CODE_HOST, undefined);
         assert.equal(env.VITE_WS_URL, undefined);
+      }),
+    );
+
+    it.effect("defaults desktop dev to bootstrapping the current workspace cwd", () =>
+      Effect.gen(function* () {
+        const env = yield* createDevRunnerEnv({
+          mode: "dev:desktop",
+          baseEnv: {},
+          cwd: "/tmp/desktop-workspace",
+          serverOffset: 0,
+          webOffset: 0,
+          t3Home: undefined,
+          authToken: undefined,
+          noBrowser: undefined,
+          autoBootstrapProjectFromCwd: undefined,
+          logWebSocketEvents: undefined,
+          host: undefined,
+          port: undefined,
+          devUrl: undefined,
+        });
+
+        assert.equal(env.T3CODE_CWD, resolve("/tmp/desktop-workspace"));
+        assert.equal(env.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD, "1");
       }),
     );
   });
