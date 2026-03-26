@@ -51,3 +51,26 @@ Docs:
 - Codex-Monitor (Tauri, feature-complete, strong reference implementation): https://github.com/Dimillian/CodexMonitor
 
 Use these as implementation references when designing protocol handling, UX flows, and operational safeguards.
+
+## Fork & Git Workflow
+
+This is a **fork** of `pingdotgg/t3code`. The git remotes are configured as:
+
+- `origin` → `git@github.com:henrik092/t3code.git` (our fork, push here)
+- `upstream` → `git@github.com:pingdotgg/t3code.git` (original repo, pull updates from here)
+
+### Syncing with upstream
+
+To pull in new changes from the original repo:
+
+```bash
+git fetch upstream && git merge upstream/main
+```
+
+When resolving merge conflicts, **our custom changes take priority** unless the upstream change is clearly a bugfix we need. Key areas where we have custom logic:
+
+- `apps/server/src/main.ts` — custom `cwd` resolution via `resolveCwd()`
+- `apps/server/src/provider/Layers/ClaudeAdapter.ts` — `effectiveModel` + `providerOptions?.binaryPath` fallback
+- `scripts/dev-runner.ts` — early `cwd` resolution with `T3CODE_CWD`
+
+After resolving conflicts, commit and push to `origin main`.
