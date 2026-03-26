@@ -74,3 +74,14 @@ When resolving merge conflicts, **our custom changes take priority** unless the 
 - `scripts/dev-runner.ts` — early `cwd` resolution with `T3CODE_CWD`
 
 After resolving conflicts, commit and push to `origin main`.
+
+## Development Environment
+
+- **User**: rik (Henrik)
+- **Machine**: MS-7C35 (Ubuntu/Linux)
+- **Working directory**: `/home/rik/Schreibtisch/t3code`
+- **Claude Code**: Runs both im Terminal und in VS Code, mit Claude Max (Opus 4.6, 1M context)
+- **Permissions**: `defaultMode: "dontAsk"` + `skipDangerousModePermissionPrompt: true` (bypass permissions)
+- **Language**: Deutsch bevorzugt für Kommunikation, Englisch für Code/Commits/Docs
+- **Runtime**: Bun (nicht npm/yarn)
+- **Plugins**: Playwright, Ralph Loop, Superpowers
