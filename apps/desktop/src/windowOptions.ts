@@ -2,7 +2,9 @@ import type { BrowserWindowConstructorOptions } from "electron";
 
 export function getPlatformWindowChromeOptions(
   platform: NodeJS.Platform,
-): Pick<BrowserWindowConstructorOptions, "titleBarStyle" | "trafficLightPosition"> | Record<string, never> {
+):
+  | Pick<BrowserWindowConstructorOptions, "titleBarStyle" | "trafficLightPosition">
+  | Record<string, never> {
   if (platform !== "darwin") {
     return {};
   }

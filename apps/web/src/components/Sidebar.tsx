@@ -85,6 +85,7 @@ import {
   SidebarMenuSubItem,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "./ui/sidebar";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
@@ -380,6 +381,11 @@ export default function Sidebar() {
     (store) => store.clearProjectDraftThreadById,
   );
   const navigate = useNavigate();
+  const { isMobile, setOpenMobile } = useSidebar();
+  /** Close the mobile sidebar sheet after any user-initiated navigation. */
+  const closeMobileSidebar = useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
   const isOnSettings = useLocation({ select: (loc) => loc.pathname === "/settings" });
   const appSettings = useSettings();
   const { updateSettings } = useUpdateSettings();
@@ -963,9 +969,11 @@ export default function Sidebar() {
         to: "/$threadId",
         params: { threadId },
       });
+      closeMobileSidebar();
     },
     [
       clearSelection,
+      closeMobileSidebar,
       navigate,
       rangeSelectTo,
       selectedThreadIds.size,
@@ -1174,6 +1182,7 @@ export default function Sidebar() {
                 to: "/$threadId",
                 params: { threadId: thread.id },
               });
+              closeMobileSidebar();
             }}
             onContextMenu={(event) => {
               event.preventDefault();
@@ -1358,6 +1367,7 @@ export default function Sidebar() {
                         defaultEnvMode: appSettings.defaultThreadEnvMode,
                       }),
                     });
+                    closeMobileSidebar();
                   }}
                 >
                   <SquarePenIcon className="size-3.5" />
@@ -1845,7 +1855,10 @@ export default function Sidebar() {
               <SidebarMenuButton
                 size="sm"
                 className="gap-2 px-2 py-1.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-                onClick={() => void navigate({ to: "/settings" })}
+                onClick={() => {
+                  void navigate({ to: "/settings" });
+                  closeMobileSidebar();
+                }}
               >
                 <SettingsIcon className="size-3.5" />
                 <span className="text-xs">Settings</span>
