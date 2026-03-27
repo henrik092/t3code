@@ -3468,7 +3468,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-muted-foreground/40">
         {!isElectron && (
-          <header className="border-b border-border px-3 py-2 md:hidden">
+          <header className="border-b border-border px-3 py-2 pt-[calc(0.5rem+var(--safe-area-top))] md:hidden">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="size-7 shrink-0" />
               <span className="text-sm font-medium text-foreground">Threads</span>
@@ -3495,7 +3495,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       <header
         className={cn(
           "border-b border-border px-3 sm:px-5",
-          isElectron ? "drag-region flex h-[52px] items-center" : "py-2 sm:py-3",
+          isElectron ? "drag-region flex h-[52px] items-center" : "py-2 pt-[calc(0.5rem+var(--safe-area-top))] sm:py-3",
         )}
       >
         <ChatHeader
@@ -3596,7 +3596,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           </div>
 
           {/* Input bar */}
-          <div className={cn("px-3 pt-1.5 sm:px-5 sm:pt-2", isGitRepo ? "pb-1" : "pb-3 sm:pb-4")}>
+          <div className={cn("px-3 pt-1.5 sm:px-5 sm:pt-2", isGitRepo ? "pb-1" : "pb-3 sm:pb-4")} style={!isGitRepo ? { paddingBottom: "calc(var(--safe-area-bottom) + 0.75rem)" } : undefined}>
             <form
               ref={composerFormRef}
               onSubmit={onSend}
