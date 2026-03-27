@@ -90,22 +90,11 @@ export const ChatHeader = memo(function ChatHeader({
       {isMobile ? (
         <Popover>
           <PopoverTrigger
-            render={
-              <Button
-                size="icon-xs"
-                variant="outline"
-                aria-label="More actions"
-              />
-            }
+            render={<Button size="icon-xs" variant="outline" aria-label="More actions" />}
           >
             <EllipsisIcon aria-hidden="true" className="size-4" />
           </PopoverTrigger>
-          <PopoverPopup
-            side="bottom"
-            align="end"
-            sideOffset={4}
-            className="w-auto"
-          >
+          <PopoverPopup side="bottom" align="end" sideOffset={4} className="w-auto">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-foreground">Terminal</span>
@@ -188,7 +177,9 @@ export const ChatHeader = memo(function ChatHeader({
               openInCwd={openInCwd}
             />
           )}
-          {activeProjectName && <GitActionsControl gitCwd={gitCwd} activeThreadId={activeThreadId} />}
+          {activeProjectName && (
+            <GitActionsControl gitCwd={gitCwd} activeThreadId={activeThreadId} />
+          )}
           <Tooltip>
             <TooltipTrigger
               render={
