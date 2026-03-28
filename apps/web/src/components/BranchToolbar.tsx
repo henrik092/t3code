@@ -110,7 +110,7 @@ export default function BranchToolbar({
 
   return (
     <div
-      className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 pt-1"
+      className="mx-auto flex w-full shrink-0 max-w-3xl items-center justify-between px-5 pt-1"
       style={{ paddingBottom: "calc(var(--safe-area-bottom) + 0.75rem)" }}
     >
       {envLocked || activeWorktreePath ? (
