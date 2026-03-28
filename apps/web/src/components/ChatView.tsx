@@ -3494,7 +3494,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       {/* Top bar */}
       <header
         className={cn(
-          "border-b border-border px-3 sm:px-5",
+          "shrink-0 border-b border-border px-3 sm:px-5",
           isElectron
             ? "drag-region flex h-[52px] items-center"
             : "py-2 pt-[calc(0.5rem+var(--safe-area-top))] sm:py-3",
@@ -3599,7 +3599,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
 
           {/* Input bar */}
           <div
-            className={cn("px-3 pt-1.5 sm:px-5 sm:pt-2", isGitRepo ? "pb-1" : "pb-3 sm:pb-4")}
+            className={cn(
+              "shrink-0 px-3 pt-1.5 sm:px-5 sm:pt-2",
+              isGitRepo ? "pb-1" : "pb-3 sm:pb-4",
+            )}
             style={
               !isGitRepo ? { paddingBottom: "calc(var(--safe-area-bottom) + 0.75rem)" } : undefined
             }
