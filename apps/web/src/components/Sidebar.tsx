@@ -101,6 +101,7 @@ import {
   SidebarMenuSubItem,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "./ui/sidebar";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { isNonEmpty as isNonEmptyString } from "effect/String";
@@ -334,6 +335,11 @@ export default function Sidebar() {
     (store) => store.clearProjectDraftThreadId,
   );
   const navigate = useNavigate();
+  const { isMobile, setOpenMobile } = useSidebar();
+  /** Close the mobile sidebar sheet after any user-initiated navigation. */
+  const closeMobileSidebar = useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const isOnSettings = pathname.startsWith("/settings");
   const appSettings = useSettings();
@@ -835,9 +841,11 @@ export default function Sidebar() {
         to: "/$threadId",
         params: { threadId },
       });
+      closeMobileSidebar();
     },
     [
       clearSelection,
+      closeMobileSidebar,
       navigate,
       rangeSelectTo,
       selectedThreadIds.size,
@@ -856,8 +864,9 @@ export default function Sidebar() {
         to: "/$threadId",
         params: { threadId },
       });
+      closeMobileSidebar();
     },
-    [clearSelection, navigate, selectedThreadIds.size, setSelectionAnchor],
+    [clearSelection, closeMobileSidebar, navigate, selectedThreadIds.size, setSelectionAnchor],
   );
 
   const handleProjectContextMenu = useCallback(
@@ -1519,6 +1528,7 @@ export default function Sidebar() {
                         defaultEnvMode: appSettings.defaultThreadEnvMode,
                       }),
                     });
+                    closeMobileSidebar();
                   }}
                 >
                   <SquarePenIcon className="size-3.5" />
@@ -1976,7 +1986,10 @@ export default function Sidebar() {
                 <SidebarMenuButton
                   size="sm"
                   className="gap-2 px-2 py-1.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-                  onClick={() => void navigate({ to: "/settings" })}
+                  onClick={() => {
+                    void navigate({ to: "/settings" });
+                    closeMobileSidebar();
+                  }}
                 >
                   <SettingsIcon className="size-3.5" />
                   <span className="text-xs">Settings</span>
