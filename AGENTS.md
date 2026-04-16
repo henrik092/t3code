@@ -69,8 +69,8 @@ git fetch upstream && git merge upstream/main
 
 When resolving merge conflicts, **our custom changes take priority** unless the upstream change is clearly a bugfix we need. Key areas where we have custom logic:
 
-- `apps/server/src/main.ts` — custom `cwd` resolution via `resolveCwd()`
-- `apps/server/src/provider/Layers/ClaudeAdapter.ts` — `effectiveModel` + `providerOptions?.binaryPath` fallback
+- `apps/server/src/cli.ts` + `apps/server/src/os-jank.ts` — custom `cwd` resolution via `resolveCwd()`
+- `apps/server/src/provider/Layers/ClaudeAdapter.ts` — Claude model option handling, binary path, and launch args
 - `scripts/dev-runner.ts` — early `cwd` resolution with `T3CODE_CWD`
 
 After resolving conflicts, commit and push to `origin main`.

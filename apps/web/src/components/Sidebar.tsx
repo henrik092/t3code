@@ -2485,7 +2485,7 @@ export default function Sidebar() {
       });
       closeMobileSidebar();
     },
-    [clearSelection, navigate, setSelectionAnchor],
+    [clearSelection, closeMobileSidebar, navigate, setSelectionAnchor],
   );
 
   const projectDnDSensors = useSensors(
