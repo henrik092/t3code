@@ -6,11 +6,13 @@
  *
  * @module GitCore
  */
-import { ServiceMap } from "effect";
-import type { Effect, Scope } from "effect";
+import { Context } from "effect";
+import type { Effect } from "effect";
 import type {
   GitCheckoutInput,
+  GitCheckoutResult,
   GitCreateBranchInput,
+  GitCreateBranchResult,
   GitCreateWorktreeInput,
   GitCreateWorktreeResult,
   GitInitInput,
@@ -22,12 +24,13 @@ import type {
   GitStatusResult,
 } from "@t3tools/contracts";
 
-import type { GitCommandError } from "../Errors.ts";
+import type { GitCommandError } from "@t3tools/contracts";
 
 export interface ExecuteGitInput {
   readonly operation: string;
   readonly cwd: string;
   readonly args: ReadonlyArray<string>;
+  readonly stdin?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly allowNonZeroExit?: boolean;
   readonly timeoutMs?: number;
@@ -40,6 +43,8 @@ export interface ExecuteGitResult {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
+  readonly stdoutTruncated: boolean;
+  readonly stderrTruncated: boolean;
 }
 
 export interface GitStatusDetails extends Omit<GitStatusResult, "pr"> {
@@ -91,6 +96,11 @@ export interface GitRangeContext {
   commitSummary: string;
   diffSummary: string;
   diffPatch: string;
+}
+
+export interface GitListWorkspaceFilesResult {
+  readonly paths: ReadonlyArray<string>;
+  readonly truncated: boolean;
 }
 
 export interface GitRenameBranchInput {
@@ -149,6 +159,11 @@ export interface GitCoreShape {
   readonly statusDetails: (cwd: string) => Effect.Effect<GitStatusDetails, GitCommandError>;
 
   /**
+   * Read detailed working tree / branch status without refreshing remote tracking refs.
+   */
+  readonly statusDetailsLocal: (cwd: string) => Effect.Effect<GitStatusDetails, GitCommandError>;
+
+  /**
    * Build staged change context for commit generation.
    */
   readonly prepareCommitContext: (
@@ -189,6 +204,26 @@ export interface GitCoreShape {
     cwd: string,
     key: string,
   ) => Effect.Effect<string | null, GitCommandError>;
+
+  /**
+   * Determine whether the provided cwd is inside a git work tree.
+   */
+  readonly isInsideWorkTree: (cwd: string) => Effect.Effect<boolean, GitCommandError>;
+
+  /**
+   * List tracked and untracked workspace file paths relative to cwd.
+   */
+  readonly listWorkspaceFiles: (
+    cwd: string,
+  ) => Effect.Effect<GitListWorkspaceFilesResult, GitCommandError>;
+
+  /**
+   * Remove gitignored paths from a relative path list.
+   */
+  readonly filterIgnoredPaths: (
+    cwd: string,
+    relativePaths: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<string>, GitCommandError>;
 
   /**
    * List local + remote branches and branch metadata.
@@ -250,14 +285,16 @@ export interface GitCoreShape {
   /**
    * Create a local branch.
    */
-  readonly createBranch: (input: GitCreateBranchInput) => Effect.Effect<void, GitCommandError>;
+  readonly createBranch: (
+    input: GitCreateBranchInput,
+  ) => Effect.Effect<GitCreateBranchResult, GitCommandError>;
 
   /**
    * Checkout an existing branch and refresh its upstream metadata in background.
    */
   readonly checkoutBranch: (
     input: GitCheckoutInput,
-  ) => Effect.Effect<void, GitCommandError, Scope.Scope>;
+  ) => Effect.Effect<GitCheckoutResult, GitCommandError>;
 
   /**
    * Initialize a repository in the provided directory.
@@ -273,6 +310,4 @@ export interface GitCoreShape {
 /**
  * GitCore - Service tag for low-level Git repository operations.
  */
-export class GitCore extends ServiceMap.Service<GitCore, GitCoreShape>()(
-  "t3/git/Services/GitCore",
-) {}
+export class GitCore extends Context.Service<GitCore, GitCoreShape>()("t3/git/Services/GitCore") {}

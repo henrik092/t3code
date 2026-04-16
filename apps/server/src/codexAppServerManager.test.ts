@@ -17,7 +17,7 @@ import {
   resolveCodexModelForAccount,
 } from "./codexAppServerManager";
 
-const asThreadId = (value: string): ThreadId => ThreadId.makeUnsafe(value);
+const asThreadId = (value: string): ThreadId => ThreadId.make(value);
 
 function createSendTurnHarness() {
   const manager = new CodexAppServerManager();
@@ -111,9 +111,9 @@ function createPendingUserInputHarness() {
     },
     pendingUserInputs: new Map([
       [
-        ApprovalRequestId.makeUnsafe("req-user-input-1"),
+        ApprovalRequestId.make("req-user-input-1"),
         {
-          requestId: ApprovalRequestId.makeUnsafe("req-user-input-1"),
+          requestId: ApprovalRequestId.make("req-user-input-1"),
           jsonRpcId: 42,
           threadId: asThreadId("thread_1"),
         },
@@ -310,7 +310,7 @@ describe("readCodexAccountSnapshot", () => {
     });
   });
 
-  it("keeps spark enabled for api key accounts", () => {
+  it("disables spark for api key accounts", () => {
     expect(
       readCodexAccountSnapshot({
         type: "apiKey",
@@ -318,7 +318,20 @@ describe("readCodexAccountSnapshot", () => {
     ).toEqual({
       type: "apiKey",
       planType: null,
-      sparkEnabled: true,
+      sparkEnabled: false,
+    });
+  });
+
+  it("disables spark for unknown chatgpt plans", () => {
+    expect(
+      readCodexAccountSnapshot({
+        type: "chatgpt",
+        email: "unknown@example.com",
+      }),
+    ).toEqual({
+      type: "chatgpt",
+      planType: "unknown",
+      sparkEnabled: false,
     });
   });
 });
@@ -342,6 +355,16 @@ describe("resolveCodexModelForAccount", () => {
         sparkEnabled: true,
       }),
     ).toBe("gpt-5.3-codex-spark");
+  });
+
+  it("falls back from spark to default for api key auth", () => {
+    expect(
+      resolveCodexModelForAccount("gpt-5.3-codex-spark", {
+        type: "apiKey",
+        planType: null,
+        sparkEnabled: false,
+      }),
+    ).toBe("gpt-5.3-codex");
   });
 });
 
@@ -720,7 +743,7 @@ describe("respondToUserInput", () => {
 
     await manager.respondToUserInput(
       asThreadId("thread_1"),
-      ApprovalRequestId.makeUnsafe("req-user-input-1"),
+      ApprovalRequestId.make("req-user-input-1"),
       {
         scope: "All request methods",
         compat: "Keep current envelope",
@@ -757,7 +780,7 @@ describe("respondToUserInput", () => {
 
     await manager.respondToUserInput(
       asThreadId("thread_1"),
-      ApprovalRequestId.makeUnsafe("req-user-input-1"),
+      ApprovalRequestId.make("req-user-input-1"),
       {
         scope: [],
       },

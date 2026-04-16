@@ -5,6 +5,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import {
+  checkPortAvailabilityOnHosts,
   createDevRunnerEnv,
   findFirstAvailableOffset,
   resolveModePortOffsets,
@@ -55,7 +56,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
-          authToken: undefined,
           noBrowser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
@@ -77,7 +77,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: "/tmp/custom-t3",
-          authToken: "secret",
           noBrowser: true,
           autoBootstrapProjectFromCwd: false,
           logWebSocketEvents: true,
@@ -89,6 +88,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(env.T3CODE_HOME, resolve("/tmp/custom-t3"));
         assert.equal(env.T3CODE_CWD, resolve("/tmp/override-workspace"));
         assert.equal(env.T3CODE_PORT, "4222");
+        assert.equal(env.VITE_HTTP_URL, "http://localhost:4222");
         assert.equal(env.VITE_WS_URL, "ws://localhost:4222");
         assert.equal(env.T3CODE_NO_BROWSER, "1");
         assert.equal(env.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD, "0");
@@ -109,7 +109,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
-          authToken: undefined,
           noBrowser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
@@ -127,12 +126,13 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
-          baseEnv: {},
-          cwd: "/tmp/dev-workspace",
+          baseEnv: {
+            T3CODE_LOG_WS_EVENTS: "1",
+          },
+          cwd: undefined,
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
-          authToken: undefined,
           noBrowser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: false,
@@ -154,7 +154,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: "/tmp/my-t3",
-          authToken: undefined,
           noBrowser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
@@ -167,22 +166,21 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    it.effect("does not export backend bootstrap env for dev:desktop", () =>
+    it.effect("pins desktop dev to a stable backend port and websocket url", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
           mode: "dev:desktop",
           baseEnv: {
-            T3CODE_PORT: "3773",
-            T3CODE_AUTH_TOKEN: "stale-token",
+            T3CODE_PORT: "13773",
             T3CODE_MODE: "web",
             T3CODE_NO_BROWSER: "0",
             T3CODE_HOST: "0.0.0.0",
-            VITE_WS_URL: "ws://localhost:3773",
+            VITE_WS_URL: "ws://localhost:13773",
           },
+          cwd: undefined,
           serverOffset: 0,
           webOffset: 0,
           t3Home: "/tmp/my-t3",
-          authToken: "fresh-token",
           noBrowser: true,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
@@ -193,14 +191,37 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
         assert.equal(env.T3CODE_HOME, resolve("/tmp/my-t3"));
         assert.equal(env.PORT, "5733");
-        assert.equal(env.ELECTRON_RENDERER_PORT, "5733");
-        assert.equal(env.VITE_DEV_SERVER_URL, "http://localhost:5733");
-        assert.equal(env.T3CODE_PORT, undefined);
-        assert.equal(env.T3CODE_AUTH_TOKEN, undefined);
+        assert.equal(env.VITE_DEV_SERVER_URL, "http://127.0.0.1:5733");
+        assert.equal(env.HOST, "127.0.0.1");
+        assert.equal(env.T3CODE_PORT, "4222");
+        assert.equal(env.VITE_HTTP_URL, "http://127.0.0.1:4222");
         assert.equal(env.T3CODE_MODE, undefined);
         assert.equal(env.T3CODE_NO_BROWSER, undefined);
         assert.equal(env.T3CODE_HOST, undefined);
-        assert.equal(env.VITE_WS_URL, undefined);
+        assert.equal(env.VITE_WS_URL, "ws://127.0.0.1:4222");
+      }),
+    );
+
+    it.effect("defaults dev server mode to the higher backend port range", () =>
+      Effect.gen(function* () {
+        const env = yield* createDevRunnerEnv({
+          mode: "dev",
+          baseEnv: {},
+          cwd: undefined,
+          serverOffset: 0,
+          webOffset: 0,
+          t3Home: undefined,
+          noBrowser: undefined,
+          autoBootstrapProjectFromCwd: undefined,
+          logWebSocketEvents: undefined,
+          host: undefined,
+          port: undefined,
+          devUrl: undefined,
+        });
+
+        assert.equal(env.T3CODE_PORT, "13773");
+        assert.equal(env.VITE_HTTP_URL, "http://localhost:13773");
+        assert.equal(env.VITE_WS_URL, "ws://localhost:13773");
       }),
     );
 
@@ -213,7 +234,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
-          authToken: undefined,
           noBrowser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
@@ -244,7 +264,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("advances until all required ports are available", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773, 5733, 3774, 5734]);
+        const taken = new Set([13773, 5733, 13774, 5734]);
         const offset = yield* findFirstAvailableOffset({
           startOffset: 0,
           requireServerPort: true,
@@ -256,16 +276,46 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    it.effect("allows offsets where only non-required ports exceed max", () =>
+    it.effect("allows offsets where the non-required server port exceeds max", () =>
       Effect.gen(function* () {
         const offset = yield* findFirstAvailableOffset({
-          startOffset: 59_803,
-          requireServerPort: true,
-          requireWebPort: false,
+          startOffset: 59_802,
+          requireServerPort: false,
+          requireWebPort: true,
           checkPortAvailability: () => Effect.succeed(true),
         });
 
-        assert.equal(offset, 59_803);
+        assert.equal(offset, 59_802);
+      }),
+    );
+  });
+
+  describe("checkPortAvailabilityOnHosts", () => {
+    it.effect("checks overlapping hosts sequentially to avoid self-interference", () =>
+      Effect.gen(function* () {
+        let inFlightCount = 0;
+        const calls: Array<[number, string]> = [];
+
+        const available = yield* checkPortAvailabilityOnHosts(
+          13_773,
+          ["127.0.0.1", "0.0.0.0", "::"],
+          (port, host) =>
+            Effect.promise(async () => {
+              calls.push([port, host]);
+              inFlightCount += 1;
+              const overlapped = inFlightCount > 1;
+              await Promise.resolve();
+              inFlightCount -= 1;
+              return !overlapped;
+            }),
+        );
+
+        assert.equal(available, true);
+        assert.deepStrictEqual(calls, [
+          [13_773, "127.0.0.1"],
+          [13_773, "0.0.0.0"],
+          [13_773, "::"],
+        ]);
       }),
     );
   });
@@ -273,7 +323,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
   describe("resolveModePortOffsets", () => {
     it.effect("uses a shared fallback offset for dev mode", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773, 5733]);
+        const taken = new Set([13773, 5733]);
         const offsets = yield* resolveModePortOffsets({
           mode: "dev",
           startOffset: 0,
@@ -303,7 +353,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("shifts only server offset for dev:server", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773]);
+        const taken = new Set([13773]);
         const offsets = yield* resolveModePortOffsets({
           mode: "dev:server",
           startOffset: 0,
