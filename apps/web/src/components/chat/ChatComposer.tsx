@@ -6,6 +6,7 @@ import type {
   ProviderApprovalDecision,
   ProviderInteractionMode,
   ProviderKind,
+  ResolvedKeybindingsConfig,
   RuntimeMode,
   ScopedThreadRef,
   ServerProvider,
@@ -16,7 +17,7 @@ import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
 } from "@t3tools/contracts";
-import { normalizeModelSlug } from "@t3tools/shared/model";
+import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import {
   forwardRef,
   memo,
@@ -59,7 +60,7 @@ import {
   shouldUseCompactComposerFooter,
 } from "../composerFooterLayout";
 import { type ComposerPromptEditorHandle, ComposerPromptEditor } from "../ComposerPromptEditor";
-import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./ProviderModelPicker";
+import { ProviderModelPicker } from "./ProviderModelPicker";
 import { type ComposerCommandItem, ComposerCommandMenu } from "./ComposerCommandMenu";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
 import { CompactComposerControlsMenu } from "./CompactComposerControlsMenu";
@@ -73,7 +74,7 @@ import {
   getComposerProviderState,
   renderProviderTraitsMenuContent,
   renderProviderTraitsPicker,
-} from "./composerProviderRegistry";
+} from "./composerProviderState";
 import { ContextWindowMeter } from "./ContextWindowMeter";
 import { buildExpandedImagePreview, type ExpandedImagePreview } from "./ExpandedImagePreview";
 import { basenameOfPath } from "../../vscode-icons";
@@ -94,7 +95,11 @@ import {
   XIcon,
 } from "lucide-react";
 import { proposedPlanTitle } from "../../proposedPlan";
-import { resolveSelectableProvider, getProviderModels } from "../../providerModels";
+import {
+  getProviderInteractionModeToggle,
+  getProviderModels,
+  resolveSelectableProvider,
+} from "../../providerModels";
 import type { UnifiedSettings } from "@t3tools/contracts/settings";
 import type { SessionPhase, Thread } from "../../types";
 import type { PendingUserInputDraftAnswer } from "../../pendingUserInput";
@@ -159,6 +164,7 @@ const terminalContextIdListsEqual = (
   contexts.length === ids.length && contexts.every((context, index) => context.id === ids[index]);
 
 const ComposerFooterModeControls = memo(function ComposerFooterModeControls(props: {
+  showInteractionModeToggle: boolean;
   interactionMode: ProviderInteractionMode;
   runtimeMode: RuntimeMode;
   showPlanToggle: boolean;
@@ -175,25 +181,29 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
     <>
       <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
 
-      <Button
-        variant="ghost"
-        className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
-        size="sm"
-        type="button"
-        onClick={props.onToggleInteractionMode}
-        title={
-          props.interactionMode === "plan"
-            ? "Plan mode — click to return to normal build mode"
-            : "Default mode — click to enter plan mode"
-        }
-      >
-        <BotIcon />
-        <span className="sr-only sm:not-sr-only">
-          {props.interactionMode === "plan" ? "Plan" : "Build"}
-        </span>
-      </Button>
+      {props.showInteractionModeToggle ? (
+        <>
+          <Button
+            variant="ghost"
+            className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
+            size="sm"
+            type="button"
+            onClick={props.onToggleInteractionMode}
+            title={
+              props.interactionMode === "plan"
+                ? "Plan mode — click to return to normal build mode"
+                : "Default mode — click to enter plan mode"
+            }
+          >
+            <BotIcon />
+            <span className="sr-only sm:not-sr-only">
+              {props.interactionMode === "plan" ? "Plan" : "Build"}
+            </span>
+          </Button>
 
-      <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+          <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+        </>
+      ) : null}
 
       <Select
         value={props.runtimeMode}
@@ -311,6 +321,9 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
 export interface ChatComposerHandle {
   focusAtEnd: () => void;
   focusAt: (cursor: number) => void;
+  openModelPicker: () => void;
+  toggleModelPicker: () => void;
+  isModelPickerOpen: () => boolean;
   readSnapshot: () => {
     value: string;
     cursor: number;
@@ -404,6 +417,8 @@ export interface ChatComposerProps {
   // Misc
   resolvedTheme: "light" | "dark";
   settings: UnifiedSettings;
+  keybindings: ResolvedKeybindingsConfig;
+  terminalOpen: boolean;
   gitCwd: string | null;
 
   // Refs the parent needs kept in sync
@@ -491,6 +506,8 @@ export const ChatComposer = memo(
       activeThreadActivities,
       resolvedTheme,
       settings,
+      keybindings,
+      terminalOpen,
       gitCwd,
       promptRef,
       composerImagesRef,
@@ -581,19 +598,24 @@ export const ChatComposer = memo(
           model: selectedModel,
           models: selectedProviderModels,
           prompt,
-          modelOptions: composerModelOptions,
+          modelOptions: composerModelOptions?.[selectedProvider],
         }),
       [composerModelOptions, prompt, selectedModel, selectedProvider, selectedProviderModels],
     );
 
     const selectedPromptEffort = composerProviderState.promptEffort;
     const selectedModelOptionsForDispatch = composerProviderState.modelOptionsForDispatch;
-    const selectedModelSelection = useMemo<ModelSelection>(
+    const composerProviderControls = useMemo(
       () => ({
-        provider: selectedProvider,
-        model: selectedModel,
-        ...(selectedModelOptionsForDispatch ? { options: selectedModelOptionsForDispatch } : {}),
+        showInteractionModeToggle: getProviderInteractionModeToggle(
+          providerStatuses,
+          selectedProvider,
+        ),
       }),
+      [providerStatuses, selectedProvider],
+    );
+    const selectedModelSelection = useMemo<ModelSelection>(
+      () => createModelSelection(selectedProvider, selectedModel, selectedModelOptionsForDispatch),
       [selectedModel, selectedModelOptionsForDispatch, selectedProvider],
     );
     const selectedModelForPicker = selectedModel;
@@ -604,6 +626,9 @@ export const ChatComposer = memo(
         codex: providerStatuses.find((provider) => provider.provider === "codex")?.models ?? [],
         claudeAgent:
           providerStatuses.find((provider) => provider.provider === "claudeAgent")?.models ?? [],
+        opencode:
+          providerStatuses.find((provider) => provider.provider === "opencode")?.models ?? [],
+        cursor: providerStatuses.find((provider) => provider.provider === "cursor")?.models ?? [],
       }),
       [providerStatuses],
     );
@@ -613,23 +638,6 @@ export const ChatComposer = memo(
         ? selectedModelForPicker
         : (normalizeModelSlug(selectedModelForPicker, selectedProvider) ?? selectedModelForPicker);
     }, [modelOptionsByProvider, selectedModelForPicker, selectedProvider]);
-    const searchableModelOptions = useMemo(
-      () =>
-        AVAILABLE_PROVIDER_OPTIONS.filter(
-          (option) => lockedProvider === null || option.value === lockedProvider,
-        ).flatMap((option) =>
-          modelOptionsByProvider[option.value].map(({ slug, name }) => ({
-            provider: option.value,
-            providerLabel: option.label,
-            slug,
-            name,
-            searchSlug: slug.toLowerCase(),
-            searchName: name.toLowerCase(),
-            searchProvider: option.label.toLowerCase(),
-          })),
-        ),
-      [lockedProvider, modelOptionsByProvider],
-    );
 
     // ------------------------------------------------------------------
     // Context window
@@ -655,6 +663,7 @@ export const ChatComposer = memo(
     const [isDragOverComposer, setIsDragOverComposer] = useState(false);
     const [isComposerFooterCompact, setIsComposerFooterCompact] = useState(false);
     const [isComposerPrimaryActionsCompact, setIsComposerPrimaryActionsCompact] = useState(false);
+    const [isComposerModelPickerOpen, setIsComposerModelPickerOpen] = useState(false);
 
     // ------------------------------------------------------------------
     // Refs
@@ -773,31 +782,8 @@ export const ChatComposer = memo(
             (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
         }));
       }
-      return searchableModelOptions
-        .filter(({ searchSlug, searchName, searchProvider }) => {
-          const query = composerTrigger.query.trim().toLowerCase();
-          if (!query) return true;
-          return (
-            searchSlug.includes(query) ||
-            searchName.includes(query) ||
-            searchProvider.includes(query)
-          );
-        })
-        .map(({ provider, providerLabel, slug, name }) => ({
-          id: `model:${provider}:${slug}`,
-          type: "model",
-          provider,
-          model: slug,
-          label: name,
-          description: `${providerLabel} · ${slug}`,
-        }));
-    }, [
-      composerTrigger,
-      searchableModelOptions,
-      selectedProvider,
-      selectedProviderStatus,
-      workspaceEntries,
-    ]);
+      return [];
+    }, [composerTrigger, selectedProvider, selectedProviderStatus, workspaceEntries]);
 
     const composerMenuOpen = Boolean(composerTrigger);
     const composerMenuSearchKey = composerTrigger
@@ -1267,7 +1253,7 @@ export const ChatComposer = memo(
         rangeStart: number,
         rangeEnd: number,
         replacement: string,
-        options?: { expectedText?: string },
+        options?: { expectedText?: string; focusEditorAfterReplace?: boolean },
       ): boolean => {
         const currentText = promptRef.current;
         const safeStart = Math.max(0, Math.min(currentText.length, rangeStart));
@@ -1296,9 +1282,11 @@ export const ChatComposer = memo(
         }
         setComposerCursor(nextCursor);
         setComposerTrigger(detectComposerTrigger(next.text, nextExpandedCursor));
-        window.requestAnimationFrame(() => {
-          composerEditorRef.current?.focusAt(nextCursor);
-        });
+        if (options?.focusEditorAfterReplace !== false) {
+          window.requestAnimationFrame(() => {
+            composerEditorRef.current?.focusAt(nextCursor);
+          });
+        }
         return true;
       },
       [
@@ -1368,20 +1356,13 @@ export const ChatComposer = memo(
         }
         if (item.type === "slash-command") {
           if (item.command === "model") {
-            const replacement = "/model ";
-            const replacementRangeEnd = extendReplacementRangeForTrailingSpace(
-              snapshot.value,
-              trigger.rangeEnd,
-              replacement,
-            );
-            const applied = applyPromptReplacement(
-              trigger.rangeStart,
-              replacementRangeEnd,
-              replacement,
-              { expectedText: snapshot.value.slice(trigger.rangeStart, replacementRangeEnd) },
-            );
+            const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "", {
+              expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
+              focusEditorAfterReplace: false,
+            });
             if (applied) {
               setComposerHighlightedItemId(null);
+              setIsComposerModelPickerOpen(true);
             }
             return;
           }
@@ -1430,20 +1411,8 @@ export const ChatComposer = memo(
           }
           return;
         }
-        onProviderModelSelect(item.provider, item.model);
-        const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "", {
-          expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
-        });
-        if (applied) {
-          setComposerHighlightedItemId(null);
-        }
       },
-      [
-        applyPromptReplacement,
-        handleInteractionModeChange,
-        onProviderModelSelect,
-        resolveActiveComposerTrigger,
-      ],
+      [applyPromptReplacement, handleInteractionModeChange, resolveActiveComposerTrigger],
     );
 
     const onComposerMenuItemHighlighted = useCallback(
@@ -1624,6 +1593,13 @@ export const ChatComposer = memo(
         focusAt: (cursor: number) => {
           composerEditorRef.current?.focusAt(cursor);
         },
+        openModelPicker: () => {
+          setIsComposerModelPickerOpen(true);
+        },
+        toggleModelPicker: () => {
+          setIsComposerModelPickerOpen((open) => !open);
+        },
+        isModelPickerOpen: () => isComposerModelPickerOpen,
         readSnapshot: () => {
           return readComposerSnapshot();
         },
@@ -1701,6 +1677,7 @@ export const ChatComposer = memo(
         promptRef,
         composerImagesRef,
         composerTerminalContextsRef,
+        isComposerModelPickerOpen,
         readComposerSnapshot,
         selectedModel,
         selectedModelOptionsForDispatch,
@@ -1916,13 +1893,19 @@ export const ChatComposer = memo(
                     model={selectedModelForPickerWithCustomFallback}
                     lockedProvider={lockedProvider}
                     providers={providerStatuses}
+                    keybindings={keybindings}
                     modelOptionsByProvider={modelOptionsByProvider}
+                    terminalOpen={terminalOpen}
+                    open={isComposerModelPickerOpen}
                     {...(composerProviderState.modelPickerIconClassName
                       ? {
                           activeProviderIconClassName:
                             composerProviderState.modelPickerIconClassName,
                         }
                       : {})}
+                    onOpenChange={(open) => {
+                      setIsComposerModelPickerOpen(open);
+                    }}
                     onProviderModelChange={onProviderModelSelect}
                   />
 
@@ -1933,6 +1916,7 @@ export const ChatComposer = memo(
                       planSidebarLabel={planSidebarLabel}
                       planSidebarOpen={planSidebarOpen}
                       runtimeMode={runtimeMode}
+                      showInteractionModeToggle={composerProviderControls.showInteractionModeToggle}
                       traitsMenuContent={providerTraitsMenuContent}
                       onToggleInteractionMode={toggleInteractionMode}
                       onTogglePlanSidebar={togglePlanSidebar}
@@ -1950,6 +1934,9 @@ export const ChatComposer = memo(
                         </>
                       ) : null}
                       <ComposerFooterModeControls
+                        showInteractionModeToggle={
+                          composerProviderControls.showInteractionModeToggle
+                        }
                         interactionMode={interactionMode}
                         runtimeMode={runtimeMode}
                         showPlanToggle={showPlanSidebarToggle}

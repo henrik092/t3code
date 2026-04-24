@@ -161,7 +161,9 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
   const publishRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
     Effect.succeed(event).pipe(
       Effect.tap((canonicalEvent) =>
-        canonicalEventLogger ? canonicalEventLogger.write(canonicalEvent, null) : Effect.void,
+        canonicalEventLogger
+          ? canonicalEventLogger.write(canonicalEvent, canonicalEvent.threadId)
+          : Effect.void,
       ),
       Effect.flatMap((canonicalEvent) => PubSub.publish(runtimeEventPubSub, canonicalEvent)),
       Effect.asVoid,
@@ -297,6 +299,40 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     return { adapter: recovered.adapter, threadId: input.threadId, isActive: true } as const;
   });
 
+  const stopStaleSessionsForThread = Effect.fn("stopStaleSessionsForThread")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly currentProvider: ProviderSession["provider"];
+  }) {
+    yield* Effect.forEach(
+      adapters,
+      (adapter) =>
+        adapter.provider === input.currentProvider
+          ? Effect.void
+          : Effect.gen(function* () {
+              const hasSession = yield* adapter.hasSession(input.threadId);
+              if (!hasSession) {
+                return;
+              }
+
+              yield* adapter.stopSession(input.threadId).pipe(
+                Effect.tap(() =>
+                  analytics.record("provider.session.stopped", {
+                    provider: adapter.provider,
+                  }),
+                ),
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("provider.session.stop-stale-failed", {
+                    threadId: input.threadId,
+                    provider: adapter.provider,
+                    cause,
+                  }),
+                ),
+              );
+            }),
+      { discard: true },
+    );
+  });
+
   const startSession: ProviderServiceShape["startSession"] = Effect.fn("startSession")(
     function* (threadId, rawInput) {
       const parsed = yield* decodeInputOrValidationError({
@@ -338,9 +374,31 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           (persistedBinding?.provider === input.provider
             ? persistedBinding.resumeCursor
             : undefined);
+        const effectiveCwd =
+          input.cwd ??
+          (persistedBinding?.provider === input.provider
+            ? readPersistedCwd(persistedBinding.runtimePayload)
+            : undefined);
+        yield* Effect.annotateCurrentSpan({
+          "provider.resume_cursor.source":
+            input.resumeCursor !== undefined
+              ? "request"
+              : effectiveResumeCursor !== undefined && persistedBinding?.provider === input.provider
+                ? "persisted"
+                : "none",
+          "provider.resume_cursor.present": effectiveResumeCursor !== undefined,
+          "provider.cwd.source":
+            input.cwd !== undefined
+              ? "request"
+              : effectiveCwd !== undefined && persistedBinding?.provider === input.provider
+                ? "persisted"
+                : "none",
+          "provider.cwd.effective": effectiveCwd ?? "",
+        });
         const adapter = yield* registry.getByProvider(input.provider);
         const session = yield* adapter.startSession({
           ...input,
+          ...(effectiveCwd !== undefined ? { cwd: effectiveCwd } : {}),
           ...(effectiveResumeCursor !== undefined ? { resumeCursor: effectiveResumeCursor } : {}),
         });
 
@@ -351,6 +409,10 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           );
         }
 
+        yield* stopStaleSessionsForThread({
+          threadId,
+          currentProvider: adapter.provider,
+        });
         yield* upsertSessionBinding(session, threadId, {
           modelSelection: input.modelSelection,
         });
@@ -358,7 +420,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           provider: session.provider,
           runtimeMode: input.runtimeMode,
           hasResumeCursor: session.resumeCursor !== undefined,
-          hasCwd: typeof input.cwd === "string" && input.cwd.trim().length > 0,
+          hasCwd: typeof effectiveCwd === "string" && effectiveCwd.trim().length > 0,
           hasModel:
             typeof input.modelSelection?.model === "string" &&
             input.modelSelection.model.trim().length > 0,
@@ -582,7 +644,14 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         if (routed.isActive) {
           yield* routed.adapter.stopSession(routed.threadId);
         }
-        yield* directory.remove(input.threadId);
+        yield* directory.upsert({
+          threadId: input.threadId,
+          provider: routed.adapter.provider,
+          status: "stopped",
+          runtimePayload: {
+            activeTurnId: null,
+          },
+        });
         yield* analytics.record("provider.session.stopped", {
           provider: routed.adapter.provider,
         });

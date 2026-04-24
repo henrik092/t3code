@@ -39,9 +39,11 @@ import {
   Cause,
 } from "effect";
 import * as Semaphore from "effect/Semaphore";
-import { ServerConfig } from "./config";
+import { writeFileStringAtomically } from "./atomicWrite.ts";
+import { ServerConfig } from "./config.ts";
 import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
+import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 
 export interface ServerSettingsShape {
   /** Start the settings runtime and attach file watching. */
@@ -80,7 +82,20 @@ export class ServerSettingsService extends Context.Service<
           getSettings: Ref.get(currentSettingsRef),
           updateSettings: (patch) =>
             Ref.get(currentSettingsRef).pipe(
-              Effect.map((currentSettings) => deepMerge(currentSettings, patch)),
+              Effect.flatMap((currentSettings) =>
+                Schema.decodeEffect(ServerSettings)(
+                  applyServerSettingsPatch(currentSettings, patch),
+                ).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new ServerSettingsError({
+                        settingsPath: "<memory>",
+                        detail: `failed to normalize server settings: ${SchemaIssue.makeFormatterDefault()(cause.issue)}`,
+                        cause,
+                      }),
+                  ),
+                ),
+              ),
               Effect.tap((nextSettings) => Ref.set(currentSettingsRef, nextSettings)),
             ),
           streamChanges: Stream.empty,
@@ -91,7 +106,7 @@ export class ServerSettingsService extends Context.Service<
 
 const ServerSettingsJson = fromLenientJson(ServerSettings);
 
-const PROVIDER_ORDER: readonly ProviderKind[] = ["codex", "claudeAgent"];
+const PROVIDER_ORDER: readonly ProviderKind[] = ["codex", "claudeAgent", "opencode", "cursor"];
 
 /**
  * Ensure the `textGenerationModelSelection` points to an enabled provider.
@@ -219,14 +234,14 @@ const makeServerSettings = Effect.gen(function* () {
   const getSettingsFromCache = Cache.get(settingsCache, cacheKey);
 
   const writeSettingsAtomically = (settings: ServerSettings) => {
-    const tempPath = `${settingsPath}.${process.pid}.${Date.now()}.tmp`;
     const sparseSettings = stripDefaultServerSettings(settings, DEFAULT_SERVER_SETTINGS) ?? {};
 
-    return Effect.succeed(`${JSON.stringify(sparseSettings, null, 2)}\n`).pipe(
-      Effect.tap(() => fs.makeDirectory(pathService.dirname(settingsPath), { recursive: true })),
-      Effect.tap((encoded) => fs.writeFileString(tempPath, encoded)),
-      Effect.flatMap(() => fs.rename(tempPath, settingsPath)),
-      Effect.ensuring(fs.remove(tempPath, { force: true }).pipe(Effect.ignore({ log: true }))),
+    return writeFileStringAtomically({
+      filePath: settingsPath,
+      contents: `${JSON.stringify(sparseSettings, null, 2)}\n`,
+    }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, pathService),
       Effect.mapError(
         (cause) =>
           new ServerSettingsError({
@@ -314,7 +329,9 @@ const makeServerSettings = Effect.gen(function* () {
       writeSemaphore.withPermits(1)(
         Effect.gen(function* () {
           const current = yield* getSettingsFromCache;
-          const next = yield* Schema.decodeEffect(ServerSettings)(deepMerge(current, patch)).pipe(
+          const next = yield* Schema.decodeEffect(ServerSettings)(
+            applyServerSettingsPatch(current, patch),
+          ).pipe(
             Effect.mapError(
               (cause) =>
                 new ServerSettingsError({

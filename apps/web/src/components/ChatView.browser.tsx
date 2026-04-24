@@ -17,12 +17,8 @@ import {
   OrchestrationSessionStatus,
   DEFAULT_SERVER_SETTINGS,
 } from "@t3tools/contracts";
-import {
-  scopedProjectKey,
-  scopedThreadKey,
-  scopeProjectRef,
-  scopeThreadRef,
-} from "@t3tools/client-runtime";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime";
+import { createModelCapabilities, createModelSelection } from "@t3tools/shared/model";
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { HttpResponse, http, ws } from "msw";
 import { setupWorker } from "msw/browser";
@@ -52,6 +48,7 @@ import { __resetLocalApiForTests } from "../localApi";
 import { AppAtomRegistryProvider } from "../rpc/atomRegistry";
 import { getServerConfig } from "../rpc/serverState";
 import { getRouter } from "../router";
+import { deriveLogicalProjectKeyFromSettings } from "../logicalProject";
 import { selectBootstrapCompleteForActiveEnvironment, useStore } from "../store";
 import { useTerminalStateStore } from "../terminalStateStore";
 import { useUiStateStore } from "../uiStateStore";
@@ -78,7 +75,18 @@ const THREAD_REF = scopeThreadRef(LOCAL_ENVIRONMENT_ID, THREAD_ID);
 const THREAD_KEY = scopedThreadKey(THREAD_REF);
 const UUID_ROUTE_RE = /^\/draft\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PROJECT_DRAFT_KEY = `${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`;
-const PROJECT_KEY = scopedProjectKey(scopeProjectRef(LOCAL_ENVIRONMENT_ID, PROJECT_ID));
+const PROJECT_LOGICAL_KEY = deriveLogicalProjectKeyFromSettings(
+  {
+    environmentId: LOCAL_ENVIRONMENT_ID,
+    id: PROJECT_ID,
+    cwd: "/repo/project",
+    repositoryIdentity: null,
+  },
+  {
+    sidebarProjectGroupingMode: DEFAULT_CLIENT_SETTINGS.sidebarProjectGroupingMode,
+    sidebarProjectGroupingOverrides: DEFAULT_CLIENT_SETTINGS.sidebarProjectGroupingOverrides,
+  },
+);
 const NOW_ISO = "2026-03-04T12:00:00.000Z";
 const BASE_TIME_MS = Date.parse(NOW_ISO);
 const ATTACHMENT_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'></svg>";
@@ -1377,6 +1385,18 @@ function dispatchChatNewShortcut(): void {
   );
 }
 
+function releaseModShortcut(key?: string): void {
+  window.dispatchEvent(
+    new KeyboardEvent("keyup", {
+      key: key ?? (isMacPlatform(navigator.platform) ? "Meta" : "Control"),
+      metaKey: false,
+      ctrlKey: false,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+}
+
 async function triggerChatNewShortcutUntilPath(
   router: ReturnType<typeof getRouter>,
   predicate: (pathname: string) => boolean,
@@ -1638,12 +1658,12 @@ describe("ChatView timeline estimator parity (full app)", () => {
     customWsRpcResolver = null;
     document.body.innerHTML = "";
   });
-  it("re-expands the bootstrap project using its scoped key", async () => {
+  it("re-expands the bootstrap project using its logical key", async () => {
     useUiStateStore.setState({
       projectExpandedById: {
-        [PROJECT_KEY]: false,
+        [PROJECT_LOGICAL_KEY]: false,
       },
-      projectOrder: [PROJECT_KEY],
+      projectOrder: [PROJECT_LOGICAL_KEY],
       threadLastVisitedAtById: {},
     });
 
@@ -1658,7 +1678,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
     try {
       await vi.waitFor(
         () => {
-          expect(useUiStateStore.getState().projectExpandedById[PROJECT_KEY]).toBe(true);
+          expect(useUiStateStore.getState().projectExpandedById[PROJECT_LOGICAL_KEY]).toBe(true);
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -3758,14 +3778,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
   it("snapshots sticky codex settings into a new draft thread", async () => {
     useComposerDraftStore.setState({
       stickyModelSelectionByProvider: {
-        codex: {
-          provider: "codex",
-          model: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            fastMode: true,
-          },
-        },
+        codex: createModelSelection("codex", "gpt-5.3-codex", [
+          { id: "reasoningEffort", value: "medium" },
+          { id: "fastMode", value: true },
+        ]),
       },
       stickyActiveProvider: "codex",
     });
@@ -3791,14 +3807,16 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
       const newDraftId = draftIdFromPath(newThreadPath);
 
+      // `toMatchObject` matches objects loosely (extras ignored) but compares
+      // arrays strictly, so wrap `options` in `arrayContaining` to keep the
+      // assertion focused on sticky `fastMode` carrying over without asserting
+      // on exactly which other options are preserved.
       expect(composerDraftFor(newDraftId)).toMatchObject({
         modelSelectionByProvider: {
           codex: {
             provider: "codex",
             model: "gpt-5.3-codex",
-            options: {
-              fastMode: true,
-            },
+            options: expect.arrayContaining([{ id: "fastMode", value: true }]),
           },
         },
         activeProvider: "codex",
@@ -3811,14 +3829,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
   it("hydrates the provider alongside a sticky claude model", async () => {
     useComposerDraftStore.setState({
       stickyModelSelectionByProvider: {
-        claudeAgent: {
-          provider: "claudeAgent",
-          model: "claude-opus-4-6",
-          options: {
-            effort: "max",
-            fastMode: true,
-          },
-        },
+        claudeAgent: createModelSelection("claudeAgent", "claude-opus-4-6", [
+          { id: "effort", value: "max" },
+          { id: "fastMode", value: true },
+        ]),
       },
       stickyActiveProvider: "claudeAgent",
     });
@@ -3846,14 +3860,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
       expect(composerDraftFor(newDraftId)).toMatchObject({
         modelSelectionByProvider: {
-          claudeAgent: {
-            provider: "claudeAgent",
-            model: "claude-opus-4-6",
-            options: {
-              effort: "max",
-              fastMode: true,
-            },
-          },
+          claudeAgent: createModelSelection("claudeAgent", "claude-opus-4-6", [
+            { id: "effort", value: "max" },
+            { id: "fastMode", value: true },
+          ]),
         },
         activeProvider: "claudeAgent",
       });
@@ -3893,14 +3903,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
   it("prefers draft state over sticky composer settings and defaults", async () => {
     useComposerDraftStore.setState({
       stickyModelSelectionByProvider: {
-        codex: {
-          provider: "codex",
-          model: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            fastMode: true,
-          },
-        },
+        codex: createModelSelection("codex", "gpt-5.3-codex", [
+          { id: "reasoningEffort", value: "medium" },
+          { id: "fastMode", value: true },
+        ]),
       },
       stickyActiveProvider: "codex",
     });
@@ -3926,27 +3932,27 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
       const draftId = draftIdFromPath(threadPath);
 
+      // See the note on the sibling sticky-codex test: arrays match strictly
+      // under `toMatchObject`, so use `arrayContaining` to keep the assertion
+      // scoped to the sticky trait (`fastMode`) that must carry over.
       expect(composerDraftFor(draftId)).toMatchObject({
         modelSelectionByProvider: {
           codex: {
             provider: "codex",
             model: "gpt-5.3-codex",
-            options: {
-              fastMode: true,
-            },
+            options: expect.arrayContaining([{ id: "fastMode", value: true }]),
           },
         },
         activeProvider: "codex",
       });
 
-      useComposerDraftStore.getState().setModelSelection(draftId, {
-        provider: "codex",
-        model: "gpt-5.4",
-        options: {
-          reasoningEffort: "low",
-          fastMode: true,
-        },
-      });
+      useComposerDraftStore.getState().setModelSelection(
+        draftId,
+        createModelSelection("codex", "gpt-5.4", [
+          { id: "reasoningEffort", value: "low" },
+          { id: "fastMode", value: true },
+        ]),
+      );
 
       await newThreadButton.click();
 
@@ -3957,14 +3963,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
       expect(composerDraftFor(draftId)).toMatchObject({
         modelSelectionByProvider: {
-          codex: {
-            provider: "codex",
-            model: "gpt-5.4",
-            options: {
-              reasoningEffort: "low",
-              fastMode: true,
-            },
-          },
+          codex: createModelSelection("codex", "gpt-5.4", [
+            { id: "reasoningEffort", value: "low" },
+            { id: "fastMode", value: true },
+          ]),
         },
         activeProvider: "codex",
       });
@@ -3998,6 +4000,29 @@ describe("ChatView timeline estimator parity (full app)", () => {
                 type: "not",
                 node: { type: "identifier", name: "terminalFocus" },
               },
+            },
+            {
+              command: "thread.jump.1",
+              shortcut: {
+                key: "1",
+                metaKey: true,
+                ctrlKey: false,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+            },
+            {
+              command: "modelPicker.jump.1",
+              shortcut: {
+                key: "1",
+                metaKey: true,
+                ctrlKey: false,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+              whenAst: { type: "identifier", name: "modelPickerOpen" },
             },
           ],
         };
@@ -5509,6 +5534,202 @@ describe("ChatView timeline estimator parity (full app)", () => {
         { timeout: 8_000, interval: 16 },
       );
     } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("opens the model picker when selecting /model", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-model-command-target" as MessageId,
+        targetText: "model command thread",
+      }),
+    });
+
+    try {
+      await waitForComposerEditor();
+      await page.getByTestId("composer-editor").fill("/mod");
+
+      const menuItem = await waitForComposerMenuItem("slash:model");
+      await menuItem.click();
+
+      await vi.waitFor(() => {
+        expect(document.querySelector(".model-picker-list")).not.toBeNull();
+        expect(findComposerProviderModelPicker()?.textContent).not.toContain("/model");
+      });
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await vi.waitFor(() => {
+        const searchInput = document.querySelector<HTMLInputElement>(
+          'input[placeholder="Search models..."]',
+        );
+        expect(searchInput).not.toBeNull();
+        expect(document.activeElement).toBe(searchInput);
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("toggles the model picker and shows jump keys immediately from the shortcut", async () => {
+    const snapshot = createSnapshotForTargetUser({
+      targetMessageId: "msg-user-model-picker-shortcut-target" as MessageId,
+      targetText: "model picker shortcut thread",
+    });
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: {
+        ...snapshot,
+        projects: snapshot.projects.map((project) =>
+          project.id === PROJECT_ID
+            ? Object.assign({}, project, {
+                defaultModelSelection: { provider: "codex", model: "gpt-5.4" },
+              })
+            : project,
+        ),
+        threads: snapshot.threads.map((thread) =>
+          thread.id === THREAD_ID
+            ? Object.assign({}, thread, {
+                modelSelection: { provider: "codex", model: "gpt-5.4" },
+              })
+            : thread,
+        ),
+      },
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          keybindings: [
+            {
+              command: "modelPicker.toggle",
+              shortcut: {
+                key: "m",
+                metaKey: false,
+                ctrlKey: true,
+                shiftKey: true,
+                altKey: false,
+                modKey: false,
+              },
+              whenAst: {
+                type: "not",
+                node: { type: "identifier", name: "terminalFocus" },
+              },
+            },
+            {
+              command: "thread.jump.1",
+              shortcut: {
+                key: "1",
+                metaKey: false,
+                ctrlKey: true,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+            },
+            {
+              command: "modelPicker.jump.1",
+              shortcut: {
+                key: "1",
+                metaKey: false,
+                ctrlKey: true,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+              whenAst: { type: "identifier", name: "modelPickerOpen" },
+            },
+          ],
+          providers: [
+            {
+              ...nextFixture.serverConfig.providers[0]!,
+              provider: "codex",
+              models: [
+                {
+                  slug: "gpt-5.1-codex-max",
+                  name: "GPT-5.1 Codex Max",
+                  isCustom: false,
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                    ],
+                  }),
+                },
+                {
+                  slug: "gpt-5.3-codex",
+                  name: "GPT-5.3 Codex",
+                  isCustom: false,
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                    ],
+                  }),
+                },
+                {
+                  slug: "gpt-5.4",
+                  name: "GPT-5.4",
+                  isCustom: false,
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      await waitForServerConfigToApply();
+      await waitForComposerEditor();
+
+      const initialPath = mounted.router.state.location.pathname;
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "m",
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      await vi.waitFor(() => {
+        expect(document.querySelector(".model-picker-list")).not.toBeNull();
+      });
+
+      const jumpLabel = isMacPlatform(navigator.platform) ? "⌃1" : "Ctrl+1";
+      await vi.waitFor(() => {
+        expect(
+          Array.from(
+            document.querySelectorAll<HTMLElement>('.model-picker-list [data-slot="kbd"]'),
+          ).some((element) => element.textContent?.trim() === jumpLabel),
+        ).toBe(true);
+      });
+      expect(mounted.router.state.location.pathname).toBe(initialPath);
+
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "m",
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      await vi.waitFor(() => {
+        expect(document.querySelector(".model-picker-list")).toBeNull();
+      });
+    } finally {
+      releaseModShortcut("Control");
       await mounted.cleanup();
     }
   });

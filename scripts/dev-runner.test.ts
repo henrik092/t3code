@@ -1,8 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { homedir } from "node:os";
-import { resolve } from "node:path";
+import * as NodeOS from "node:os";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Path } from "effect";
 
 import {
   checkPortAvailabilityOnHosts,
@@ -49,6 +48,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
   describe("createDevRunnerEnv", () => {
     it.effect("defaults T3CODE_HOME to ~/.t3 when not provided", () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
@@ -64,12 +64,13 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: undefined,
         });
 
-        assert.equal(env.T3CODE_HOME, resolve(homedir(), ".t3"));
+        assert.equal(env.T3CODE_HOME, path.resolve(NodeOS.homedir(), ".t3"));
       }),
     );
 
     it.effect("supports explicit typed overrides", () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const env = yield* createDevRunnerEnv({
           mode: "dev:server",
           baseEnv: {},
@@ -85,8 +86,8 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: new URL("http://localhost:7331"),
         });
 
-        assert.equal(env.T3CODE_HOME, resolve("/tmp/custom-t3"));
-        assert.equal(env.T3CODE_CWD, resolve("/tmp/override-workspace"));
+        assert.equal(env.T3CODE_HOME, path.resolve("/tmp/custom-t3"));
+        assert.equal(env.T3CODE_CWD, path.resolve("/tmp/override-workspace"));
         assert.equal(env.T3CODE_PORT, "4222");
         assert.equal(env.VITE_HTTP_URL, "http://localhost:4222");
         assert.equal(env.VITE_WS_URL, "ws://localhost:4222");
@@ -147,6 +148,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("uses custom t3Home when provided", () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
@@ -162,12 +164,13 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: undefined,
         });
 
-        assert.equal(env.T3CODE_HOME, resolve("/tmp/my-t3"));
+        assert.equal(env.T3CODE_HOME, path.resolve("/tmp/my-t3"));
       }),
     );
 
     it.effect("pins desktop dev to a stable backend port and websocket url", () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const env = yield* createDevRunnerEnv({
           mode: "dev:desktop",
           baseEnv: {
@@ -189,7 +192,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: undefined,
         });
 
-        assert.equal(env.T3CODE_HOME, resolve("/tmp/my-t3"));
+        assert.equal(env.T3CODE_HOME, path.resolve("/tmp/my-t3"));
         assert.equal(env.PORT, "5733");
         assert.equal(env.VITE_DEV_SERVER_URL, "http://127.0.0.1:5733");
         assert.equal(env.HOST, "127.0.0.1");
@@ -227,6 +230,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("defaults desktop dev to bootstrapping the current workspace cwd", () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const env = yield* createDevRunnerEnv({
           mode: "dev:desktop",
           baseEnv: {},
@@ -242,7 +246,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: undefined,
         });
 
-        assert.equal(env.T3CODE_CWD, resolve("/tmp/desktop-workspace"));
+        assert.equal(env.T3CODE_CWD, path.resolve("/tmp/desktop-workspace"));
         assert.equal(env.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD, "1");
       }),
     );
