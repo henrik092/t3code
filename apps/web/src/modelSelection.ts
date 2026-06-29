@@ -114,6 +114,38 @@ function applyInstanceModelPreferences(
   );
 }
 
+const LOCAL_APP_MODEL_OPTIONS_BY_PROVIDER: ReadonlyMap<
+  ProviderDriverKind,
+  ReadonlyArray<AppModelOption>
+> = new Map([
+  [
+    ProviderDriverKind.make("codex"),
+    [
+      {
+        slug: "gpt-5.5",
+        name: "GPT-5.5",
+        isCustom: false,
+      },
+    ],
+  ],
+]);
+
+function appendLocalAppModelOptions(
+  options: AppModelOption[],
+  seen: Set<string>,
+  builtInModelSlugs: Set<string>,
+  provider: ProviderDriverKind,
+): void {
+  for (const option of LOCAL_APP_MODEL_OPTIONS_BY_PROVIDER.get(provider) ?? []) {
+    if (seen.has(option.slug)) {
+      continue;
+    }
+    seen.add(option.slug);
+    builtInModelSlugs.add(option.slug);
+    options.push({ ...option });
+  }
+}
+
 export function normalizeCustomModelSlugs(
   models: Iterable<string | null | undefined>,
   builtInModelSlugs: ReadonlySet<string>,
@@ -156,6 +188,7 @@ export function getAppModelOptions(
       model.isCustom ? Result.failVoid : Result.succeed(model.slug),
     ),
   );
+  appendLocalAppModelOptions(options, seen, builtInModelSlugs, provider);
 
   // Read from the default instance's config first (that's where edits
   // now land), falling back to the legacy per-kind bucket so unmigrated
@@ -204,6 +237,7 @@ export function getAppModelOptionsForInstance(
       model.isCustom ? Result.failVoid : Result.succeed(model.slug),
     ),
   );
+  appendLocalAppModelOptions(options, seen, builtInModelSlugs, entry.driverKind);
 
   const customModels = readInstanceCustomModels(settings, entry.instanceId, entry.driverKind);
   const normalizer = entry.driverKind;

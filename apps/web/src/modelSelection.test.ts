@@ -55,6 +55,22 @@ function settingsWithProviderInstances(): UnifiedSettings {
 }
 
 describe("instance-scoped model selection", () => {
+  it("includes local Codex model options even before the server catalog reports them", () => {
+    const providers = [
+      provider({
+        instanceId: "codex",
+        models: ["gpt-5.4"],
+      }),
+    ];
+    const codex = deriveProviderInstanceEntries(providers).find(
+      (entry) => entry.instanceId === "codex",
+    )!;
+
+    expect(
+      getAppModelOptionsForInstance(DEFAULT_UNIFIED_SETTINGS, codex).map((option) => option.slug),
+    ).toContain("gpt-5.5");
+  });
+
   it("keeps custom models on the provider instance that declared them", () => {
     const providers = [
       provider({
