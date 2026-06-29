@@ -1,4 +1,4 @@
-import { pathToFileURL } from "node:url";
+import * as NodeURL from "node:url";
 
 import type { ChatAttachment, ProviderApprovalDecision, RuntimeMode } from "@t3tools/contracts";
 import {
@@ -11,27 +11,30 @@ import {
   type QuestionAnswer,
   type QuestionRequest,
 } from "@opencode-ai/sdk/v2";
-import {
-  Cause,
-  Context,
-  Data,
-  Deferred,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Option,
-  Predicate as P,
-  Ref,
-  Result,
-  Scope,
-  Stream,
-} from "effect";
+import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as P from "effect/Predicate";
+import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import * as Scope from "effect/Scope";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { isWindowsCommandNotFound } from "../processRunner.ts";
 import { collectStreamAsString } from "./providerSnapshot.ts";
-import { NetService } from "@t3tools/shared/Net";
+import * as NetService from "@t3tools/shared/Net";
+import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { resolveSpawnCommand } from "@t3tools/shared/shell";
+const encodeUnknownJsonStringExit = Schema.encodeUnknownExit(Schema.UnknownFromJsonString);
+const OPENCODE_EMPTY_CONFIG_CONTENT = "{}";
 
 const OPENCODE_SERVER_READY_PREFIX = "opencode server listening";
 const DEFAULT_OPENCODE_SERVER_TIMEOUT_MS = 5_000;
@@ -57,6 +60,11 @@ export class OpenCodeRuntimeError extends Data.TaggedError(OPENCODE_RUNTIME_ERRO
     P.isTagged(u, OPENCODE_RUNTIME_ERROR_TAG);
 }
 
+function encodeJsonStringForDiagnostics(input: unknown): string | undefined {
+  const result = encodeUnknownJsonStringExit(input);
+  return Exit.isSuccess(result) ? result.value : undefined;
+}
+
 export function openCodeRuntimeErrorDetail(cause: unknown): string {
   if (OpenCodeRuntimeError.is(cause)) return cause.detail;
   if (cause instanceof Error && cause.message.trim().length > 0) return cause.message.trim();
@@ -65,10 +73,9 @@ export function openCodeRuntimeErrorDetail(cause: unknown): string {
     const anyCause = cause as Record<string, unknown>;
     const status = (anyCause.response as { status?: number } | undefined)?.status;
     const body = anyCause.error ?? anyCause.data ?? anyCause.body;
-    try {
-      return `status=${status ?? "?"} body=${JSON.stringify(body ?? cause)}`;
-    } catch {
-      /* fall through */
+    const encodedBody = encodeJsonStringForDiagnostics(body ?? cause);
+    if (encodedBody) {
+      return `status=${status ?? "?"} body=${encodedBody}`;
     }
   }
   return String(cause);
@@ -109,6 +116,7 @@ export interface OpenCodeRuntimeShape {
    */
   readonly startOpenCodeServerProcess: (input: {
     readonly binaryPath: string;
+    readonly environment?: NodeJS.ProcessEnv;
     readonly port?: number;
     readonly hostname?: string;
     readonly timeoutMs?: number;
@@ -121,6 +129,7 @@ export interface OpenCodeRuntimeShape {
   readonly connectToOpenCodeServer: (input: {
     readonly binaryPath: string;
     readonly serverUrl?: string | null;
+    readonly environment?: NodeJS.ProcessEnv;
     readonly port?: number;
     readonly hostname?: string;
     readonly timeoutMs?: number;
@@ -128,6 +137,7 @@ export interface OpenCodeRuntimeShape {
   readonly runOpenCodeCommand: (input: {
     readonly binaryPath: string;
     readonly args: ReadonlyArray<string>;
+    readonly environment?: NodeJS.ProcessEnv;
   }) => Effect.Effect<OpenCodeCommandResult, OpenCodeRuntimeError>;
   readonly createOpenCodeSdkClient: (input: {
     readonly baseUrl: string;
@@ -196,7 +206,7 @@ export function toOpenCodeFileParts(input: {
       type: "file",
       mime: attachment.mimeType,
       filename: attachment.name,
-      url: pathToFileURL(attachmentPath).href,
+      url: NodeURL.pathToFileURL(attachmentPath).href,
     });
   }
 
@@ -267,14 +277,18 @@ function ensureRuntimeError(
 
 const makeOpenCodeRuntime = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const netService = yield* NetService;
+  const netService = yield* NetService.NetService;
+  const hostPlatform = yield* HostProcessPlatform;
+  const resolveCommand = (command: string, args: ReadonlyArray<string>, env?: NodeJS.ProcessEnv) =>
+    resolveSpawnCommand(command, args, env ? { env } : {});
 
   const runOpenCodeCommand: OpenCodeRuntimeShape["runOpenCodeCommand"] = (input) =>
     Effect.gen(function* () {
+      const spawnCommand = yield* resolveCommand(input.binaryPath, input.args, input.environment);
       const child = yield* spawner.spawn(
-        ChildProcess.make(input.binaryPath, [...input.args], {
-          shell: process.platform === "win32",
-          env: process.env,
+        ChildProcess.make(spawnCommand.command, spawnCommand.args, {
+          shell: spawnCommand.shell,
+          ...(input.environment ? { env: input.environment } : { extendEnv: true }),
         }),
       );
       const [stdout, stderr, code] = yield* Effect.all(
@@ -282,7 +296,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
         { concurrency: "unbounded" },
       );
       const exitCode = Number(code);
-      if (isWindowsCommandNotFound(exitCode, stderr)) {
+      if (yield* isWindowsCommandNotFound(exitCode, stderr)) {
         return yield* new OpenCodeRuntimeError({
           operation: "runOpenCodeCommand",
           detail: `spawn ${input.binaryPath} ENOENT`,
@@ -326,14 +340,18 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
         ));
       const timeoutMs = input.timeoutMs ?? DEFAULT_OPENCODE_SERVER_TIMEOUT_MS;
       const args = ["serve", `--hostname=${hostname}`, `--port=${port}`];
+      const spawnCommand = yield* resolveCommand(input.binaryPath, args, input.environment);
 
       const child = yield* spawner
         .spawn(
-          ChildProcess.make(input.binaryPath, args, {
+          ChildProcess.make(spawnCommand.command, spawnCommand.args, {
+            detached: hostPlatform !== "win32",
+            shell: spawnCommand.shell,
             env: {
-              ...process.env,
-              OPENCODE_CONFIG_CONTENT: JSON.stringify({}),
+              ...input.environment,
+              OPENCODE_CONFIG_CONTENT: OPENCODE_EMPTY_CONFIG_CONTENT,
             },
+            extendEnv: input.environment === undefined,
           }),
         )
         .pipe(
@@ -347,6 +365,25 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
               }),
           ),
         );
+
+      const killOpenCodeProcessGroup = (signal: NodeJS.Signals) =>
+        hostPlatform === "win32"
+          ? child.kill({ killSignal: signal, forceKillAfter: "1 second" }).pipe(Effect.asVoid)
+          : Effect.sync(() => {
+              try {
+                process.kill(-Number(child.pid), signal);
+              } catch {
+                // The direct child may already have exited after starting the
+                // server; the process group kill is best-effort cleanup for
+                // any serve process left in that group.
+              }
+            });
+      const terminateChild = killOpenCodeProcessGroup("SIGTERM").pipe(
+        Effect.andThen(Effect.sleep("1 second")),
+        Effect.andThen(killOpenCodeProcessGroup("SIGKILL")),
+        Effect.ignore,
+      );
+      yield* Scope.addFinalizer(runtimeScope, terminateChild);
 
       const stdoutRef = yield* Ref.make("");
       const stderrRef = yield* Ref.make("");
@@ -452,6 +489,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
 
     return startOpenCodeServerProcess({
       binaryPath: input.binaryPath,
+      ...(input.environment !== undefined ? { environment: input.environment } : {}),
       ...(input.port !== undefined ? { port: input.port } : {}),
       ...(input.hostname !== undefined ? { hostname: input.hostname } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
@@ -514,7 +552,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
 });
 
 export class OpenCodeRuntime extends Context.Service<OpenCodeRuntime, OpenCodeRuntimeShape>()(
-  "t3/provider/OpenCodeRuntime",
+  "t3/provider/opencodeRuntime",
 ) {}
 
 export const OpenCodeRuntimeLive = Layer.effect(OpenCodeRuntime, makeOpenCodeRuntime).pipe(

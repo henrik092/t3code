@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import type { Thread } from "../types";
 import {
   buildThreadActionItems,
@@ -14,23 +14,22 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
   return {
     id: ThreadId.make("thread-1"),
     environmentId: LOCAL_ENVIRONMENT_ID,
-    codexThreadId: null,
     projectId: PROJECT_ID,
     title: "Thread",
-    modelSelection: { provider: "codex", model: "gpt-5" },
+    modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
     runtimeMode: "full-access",
     interactionMode: "default",
     session: null,
     messages: [],
     proposedPlans: [],
-    error: null,
     createdAt: "2026-03-01T00:00:00.000Z",
     archivedAt: null,
+    deletedAt: null,
     updatedAt: "2026-03-01T00:00:00.000Z",
     latestTurn: null,
     branch: null,
     worktreePath: null,
-    turnDiffSummaries: [],
+    checkpoints: [],
     activities: [],
     ...overrides,
   };

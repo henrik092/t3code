@@ -2,8 +2,9 @@
 
 ## Task Completion Requirements
 
-- All of `bun fmt`, `bun lint`, and `bun typecheck` must pass before considering tasks completed.
-- NEVER run `bun test`. Always use `bun run test` (runs Vitest).
+- `vp check` and `vp run typecheck` must pass before considering tasks completed.
+  - If changing native mobile code, `vp run lint:mobile` must also pass.
+- Use `vp test` for the built-in Vite+ test command and `vp run test` when you specifically need the `test` package script.
 
 ## Project Snapshot
 
@@ -28,22 +29,8 @@ Long term maintainability is a core priority. If you add new functionality, firs
 - `apps/server`: Node.js WebSocket server. Wraps Codex app-server (JSON-RPC over stdio), serves the React web app, and manages provider sessions.
 - `apps/web`: React/Vite UI. Owns session UX, conversation/event rendering, and client-side state. Connects to the server via WebSocket.
 - `packages/contracts`: Shared effect/Schema schemas and TypeScript contracts for provider events, WebSocket protocol, and model/session types. Keep this package schema-only — no runtime logic.
-- `packages/shared`: Shared runtime utilities consumed by both server and web. Uses explicit subpath exports (e.g. `@t3tools/shared/git`) — no barrel index.
-
-## Codex App Server (Important)
-
-T3 Code is currently Codex-first. The server starts `codex app-server` (JSON-RPC over stdio) per provider session, then streams structured events to the browser through WebSocket push messages.
-
-How we use it in this codebase:
-
-- Session startup/resume and turn lifecycle are brokered in `apps/server/src/codexAppServerManager.ts`.
-- Provider dispatch and thread event logging are coordinated in `apps/server/src/providerManager.ts`.
-- WebSocket server routes NativeApi methods in `apps/server/src/wsServer.ts`.
-- Web app consumes orchestration domain events via WebSocket push on channel `orchestration.domainEvent` (provider runtime activity is projected into orchestration events server-side).
-
-Docs:
-
-- Codex App Server docs: https://developers.openai.com/codex/sdk/#app-server
+- `packages/shared`: Shared runtime utilities consumed by both server and client applications. Uses explicit subpath exports (e.g. `@t3tools/shared/git`) — no barrel index.
+- `packages/client-runtime`: Shared runtime package for sharing client code across web and mobile.
 
 ## Reference Repos
 
@@ -52,36 +39,37 @@ Docs:
 
 Use these as implementation references when designing protocol handling, UX flows, and operational safeguards.
 
-## Fork & Git Workflow
+## Vendored Repositories
 
-This is a **fork** of `pingdotgg/t3code`. The git remotes are configured as:
+This project vendors external repositories under `.repos/` as read-only reference material for coding
+agents.
 
-- `origin` → `git@github.com:henrik092/t3code.git` (our fork, push here)
-- `upstream` → `git@github.com:pingdotgg/t3code.git` (original repo, pull updates from here)
+- Prefer examples and patterns from the vendored source code over generated guesses or web search results.
+- Do not edit files under `.repos/` unless explicitly asked.
+- Do not import from `.repos/`; application code must continue importing from normal package dependencies.
+- Manage vendored subtrees with `bun run sync:repos`; use `bun run sync:repos --repo <id>` to sync one
+  configured repository.
+- When updating a dependency with a configured vendored subtree, sync that subtree in the same change so
+  `.repos/` matches the installed dependency version.
+- When writing Effect code, read `.repos/effect-smol/LLMS.md` first and inspect `.repos/effect-smol/` for
+  examples of idiomatic usage, tests, module structure, and API design.
+- When writing relay infrastructure code with Alchemy, inspect `.repos/alchemy-effect/` for examples of
+  idiomatic usage, tests, module structure, and API design.
 
-### Syncing with upstream
+## Local Fork Workflow
 
-To pull in new changes from the original repo:
+This checkout is Henrik's fork of `pingdotgg/t3code`.
 
-```bash
-git fetch upstream && git merge upstream/main
-```
+- `origin` -> `git@github.com:henrik092/t3code.git`
+- `upstream` -> `git@github.com:pingdotgg/t3code.git`
 
-When resolving merge conflicts, **our custom changes take priority** unless the upstream change is clearly a bugfix we need. Key areas where we have custom logic:
+Pull upstream updates with `git fetch upstream` and `git merge upstream/main`. Preserve local deployment
+fixes for the Proxmox T3 Code instance unless upstream has replaced them with equivalent behavior.
 
-- `apps/server/src/cli.ts` + `apps/server/src/os-jank.ts` — custom `cwd` resolution via `resolveCwd()`
-- `apps/server/src/provider/Layers/ClaudeAdapter.ts` — Claude model option handling, binary path, and launch args
-- `scripts/dev-runner.ts` — early `cwd` resolution with `T3CODE_CWD`
+## Local Environment
 
-After resolving conflicts, commit and push to `origin main`.
-
-## Development Environment
-
-- **User**: rik (Henrik)
-- **Machine**: MS-7C35 (Ubuntu/Linux)
-- **Working directory**: `/home/rik/Schreibtisch/t3code`
-- **Claude Code**: Runs both im Terminal und in VS Code, mit Claude Max (Opus 4.6, 1M context)
-- **Permissions**: `defaultMode: "dontAsk"` + `skipDangerousModePermissionPrompt: true` (bypass permissions)
-- **Language**: Deutsch bevorzugt für Kommunikation, Englisch für Code/Commits/Docs
-- **Runtime**: Bun (nicht npm/yarn)
-- **Plugins**: Playwright, Ralph Loop, Superpowers
+- User: `rik`
+- Working directory: `/home/rik/Schreibtisch/t3code`
+- Runtime/package manager: follow the current upstream package manager in `package.json`
+- Communication with Rik is usually German; code, commits, and project docs stay English unless a file
+  is already German.

@@ -1,6 +1,6 @@
-import { Schema } from "effect";
 import { assert, it } from "@effect/vitest";
-import { Effect } from "effect";
+import * as Schema from "effect/Schema";
+import * as Effect from "effect/Effect";
 
 import {
   KeybindingsConfig,
@@ -28,6 +28,18 @@ it.effect("parses keybinding rules", () =>
       command: "terminal.toggle",
     });
     assert.strictEqual(parsed.command, "terminal.toggle");
+
+    const parsedSidebarToggle = yield* decode(KeybindingRule, {
+      key: "mod+b",
+      command: "sidebar.toggle",
+    });
+    assert.strictEqual(parsedSidebarToggle.command, "sidebar.toggle");
+
+    const parsedRightPanelToggle = yield* decode(KeybindingRule, {
+      key: "mod+alt+b",
+      command: "rightPanel.toggle",
+    });
+    assert.strictEqual(parsedRightPanelToggle.command, "rightPanel.toggle");
 
     const parsedClose = yield* decode(KeybindingRule, {
       key: "mod+w",
@@ -100,8 +112,9 @@ it.effect("parses keybindings array payload", () =>
     const parsed = yield* decode(KeybindingsConfig, [
       { key: "mod+j", command: "terminal.toggle" },
       { key: "mod+d", command: "terminal.split", when: "terminalFocus" },
+      { key: "mod+shift+d", command: "terminal.splitVertical", when: "terminalFocus" },
     ]);
-    assert.lengthOf(parsed, 2);
+    assert.lengthOf(parsed, 3);
   }),
 );
 

@@ -26,6 +26,7 @@ export interface MarkdownFileLinkMeta {
   filePath: string;
   targetPath: string;
   displayPath: string;
+  workspaceRelativePath: string | null;
   basename: string;
   line?: number;
   column?: number;
@@ -39,6 +40,14 @@ function safeDecode(value: string): string {
   }
 }
 
+function unwrapMarkdownLinkDestination(value: string): string {
+  return value.startsWith("<") && value.endsWith(">") ? value.slice(1, -1) : value;
+}
+
+export function normalizeMarkdownLinkDestination(value: string): string {
+  return unwrapMarkdownLinkDestination(value.trim());
+}
+
 function stripSearchAndHash(value: string): { path: string; hash: string } {
   const hashIndex = value.indexOf("#");
   const pathWithSearch = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
@@ -46,6 +55,10 @@ function stripSearchAndHash(value: string): { path: string; hash: string } {
   const queryIndex = pathWithSearch.indexOf("?");
   const path = queryIndex >= 0 ? pathWithSearch.slice(0, queryIndex) : pathWithSearch;
   return { path, hash: rawHash };
+}
+
+function normalizeWindowsDrivePath(path: string): string {
+  return /^\/[A-Za-z]:[\\/]/.test(path) ? path.slice(1) : path;
 }
 
 function parseFileUrlHref(
@@ -60,7 +73,7 @@ function parseFileUrlHref(
     if (rawPath.length === 0) return null;
 
     // Browser URL parser encodes "C:/foo" as "/C:/foo" for file URLs.
-    const normalizedPath = /^\/[A-Za-z]:[\\/]/.test(rawPath) ? rawPath.slice(1) : rawPath;
+    const normalizedPath = normalizeWindowsDrivePath(rawPath);
 
     return {
       path: options?.decodePath === false ? normalizedPath : safeDecode(normalizedPath),
@@ -73,7 +86,8 @@ function parseFileUrlHref(
 
 export function rewriteMarkdownFileUriHref(href: string | undefined): string | null {
   if (!href) return null;
-  const target = parseFileUrlHref(href.trim(), { decodePath: false });
+  const normalizedHref = normalizeMarkdownLinkDestination(href);
+  const target = parseFileUrlHref(normalizedHref, { decodePath: false });
   if (!target) return null;
   return `${target.path}${target.hash}`;
 }
@@ -124,14 +138,16 @@ export function resolveMarkdownFileLinkTarget(
   cwd?: string,
 ): string | null {
   if (!href) return null;
-  const rawHref = href.trim();
+  const rawHref = normalizeMarkdownLinkDestination(href);
   if (rawHref.length === 0 || rawHref.startsWith("#")) return null;
 
   const fileUrlTarget = rawHref.toLowerCase().startsWith("file:")
     ? parseFileUrlHref(rawHref)
     : null;
   const source = fileUrlTarget ?? stripSearchAndHash(rawHref);
-  const decodedPath = fileUrlTarget ? source.path.trim() : safeDecode(source.path.trim());
+  const decodedPath = normalizeWindowsDrivePath(
+    fileUrlTarget ? source.path.trim() : safeDecode(source.path.trim()),
+  );
   const decodedHash = safeDecode(source.hash.trim());
 
   if (decodedPath.length === 0) return null;
@@ -159,6 +175,19 @@ function basenameOfPath(path: string): string {
   return separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
 }
 
+function workspaceRelativePath(path: string, workspaceRoot: string | undefined): string | null {
+  if (!workspaceRoot) return null;
+  const normalizedPath = normalizeWindowsDrivePath(path.replaceAll("\\", "/"));
+  const normalizedRoot = normalizeWindowsDrivePath(workspaceRoot.replaceAll("\\", "/")).replace(
+    /\/+$/,
+    "",
+  );
+  const pathForCompare = normalizedPath.toLowerCase();
+  const rootForCompare = normalizedRoot.toLowerCase();
+  if (!pathForCompare.startsWith(`${rootForCompare}/`)) return null;
+  return normalizedPath.slice(normalizedRoot.length + 1);
+}
+
 export function resolveMarkdownFileLinkMeta(
   href: string | undefined,
   cwd?: string,
@@ -176,6 +205,7 @@ export function resolveMarkdownFileLinkMeta(
     filePath: path,
     targetPath,
     displayPath: formatWorkspaceRelativePath(targetPath, cwd),
+    workspaceRelativePath: workspaceRelativePath(path, cwd),
     basename: basenameOfPath(path),
     ...(lineNumber !== undefined ? { line: lineNumber } : {}),
     ...(columnNumber !== undefined ? { column: columnNumber } : {}),

@@ -1,6 +1,6 @@
 import {
   type ProjectEntry,
-  type ProviderKind,
+  type ProviderDriverKind,
   type ServerProviderSkill,
   type ServerProviderSlashCommand,
 } from "@t3tools/contracts";
@@ -18,7 +18,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "../ui/command";
-import { VscodeEntryIcon } from "./VscodeEntryIcon";
+import { PierreEntryIcon } from "./PierreEntryIcon";
 
 export type ComposerCommandItem =
   | {
@@ -39,7 +39,7 @@ export type ComposerCommandItem =
   | {
       id: string;
       type: "provider-slash-command";
-      provider: ProviderKind;
+      provider: ProviderDriverKind;
       command: ServerProviderSlashCommand;
       label: string;
       description: string;
@@ -47,7 +47,7 @@ export type ComposerCommandItem =
   | {
       id: string;
       type: "skill";
-      provider: ProviderKind;
+      provider: ProviderDriverKind;
       skill: ServerProviderSkill;
       label: string;
       description: string;
@@ -141,34 +141,35 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
     >
       <div
         ref={listRef}
-        className="relative overflow-hidden rounded-xl border border-border/80 bg-popover/96 shadow-lg/8 backdrop-blur-xs"
+        className="relative w-full overflow-hidden rounded-[20px] border border-border/80 bg-popover/96 shadow-lg/8 backdrop-blur-xs"
       >
-        <CommandList className="max-h-72">
-          {groups.map((group, groupIndex) => (
-            <div key={group.id}>
-              {groupIndex > 0 ? <CommandSeparator className="my-0.5" /> : null}
-              <CommandGroup>
-                {group.label ? (
-                  <CommandGroupLabel className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/55">
-                    {group.label}
-                  </CommandGroupLabel>
-                ) : null}
-                {group.items.map((item) => (
-                  <ComposerCommandMenuItem
-                    key={item.id}
-                    item={item}
-                    resolvedTheme={props.resolvedTheme}
-                    isActive={props.activeItemId === item.id}
-                    onHighlight={props.onHighlightedItemChange}
-                    onSelect={props.onSelect}
-                  />
-                ))}
-              </CommandGroup>
-            </div>
-          ))}
-        </CommandList>
-        {props.items.length === 0 ? (
-          <div className="px-3 py-2">
+        {props.items.length > 0 ? (
+          <CommandList className="max-h-72">
+            {groups.map((group, groupIndex) => (
+              <div key={group.id}>
+                {groupIndex > 0 ? <CommandSeparator className="my-0.5" /> : null}
+                <CommandGroup>
+                  {group.label ? (
+                    <CommandGroupLabel className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/55">
+                      {group.label}
+                    </CommandGroupLabel>
+                  ) : null}
+                  {group.items.map((item) => (
+                    <ComposerCommandMenuItem
+                      key={item.id}
+                      item={item}
+                      resolvedTheme={props.resolvedTheme}
+                      isActive={props.activeItemId === item.id}
+                      onHighlight={props.onHighlightedItemChange}
+                      onSelect={props.onSelect}
+                    />
+                  ))}
+                </CommandGroup>
+              </div>
+            ))}
+          </CommandList>
+        ) : (
+          <div className="px-5 py-3.5">
             {props.triggerKind === "skill" ? (
               <CommandGroup>
                 <CommandGroupLabel className="px-0 pt-0 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/55">
@@ -192,7 +193,7 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
               </p>
             )}
           </div>
-        ) : null}
+        )}
       </div>
     </Command>
   );
@@ -227,7 +228,7 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
       }}
     >
       {props.item.type === "path" ? (
-        <VscodeEntryIcon
+        <PierreEntryIcon
           pathValue={props.item.path}
           kind={props.item.pathKind}
           theme={props.resolvedTheme}
