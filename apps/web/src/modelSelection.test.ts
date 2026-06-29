@@ -15,7 +15,7 @@ function provider(input: {
 }): ServerProvider {
   const driver =
     input.provider ??
-    (input.instanceId.startsWith("claude_")
+    (input.instanceId === "claudeAgent" || input.instanceId.startsWith("claude_")
       ? ProviderDriverKind.make("claudeAgent")
       : ProviderDriverKind.make("codex"));
   return {
