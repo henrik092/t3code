@@ -218,6 +218,7 @@ function resolveBaseDir(baseDir: string | undefined): Effect.Effect<string, neve
 interface CreateDevRunnerEnvInput {
   readonly mode: DevMode;
   readonly baseEnv: NodeJS.ProcessEnv;
+  readonly cwd: string | undefined;
   readonly serverOffset: number;
   readonly webOffset: number;
   readonly t3Home: string | undefined;
@@ -232,6 +233,7 @@ interface CreateDevRunnerEnvInput {
 export function createDevRunnerEnv({
   mode,
   baseEnv,
+  cwd,
   serverOffset,
   webOffset,
   t3Home,
@@ -243,10 +245,12 @@ export function createDevRunnerEnv({
   devUrl,
 }: CreateDevRunnerEnvInput): Effect.Effect<NodeJS.ProcessEnv, never, Path.Path> {
   return Effect.gen(function* () {
+    const path = yield* Path.Path;
     const serverPort = port ?? BASE_SERVER_PORT + serverOffset;
     const webPort = BASE_WEB_PORT + webOffset;
     const resolvedBaseDir = yield* resolveBaseDir(t3Home);
     const isDesktopMode = mode === "dev:desktop";
+    const resolvedCwd = cwd?.trim() ? path.resolve(cwd) : undefined;
 
     const output: NodeJS.ProcessEnv = {
       ...baseEnv,
@@ -256,6 +260,11 @@ export function createDevRunnerEnv({
         `http://${isDesktopMode ? DESKTOP_DEV_LOOPBACK_HOST : "localhost"}:${webPort}`,
       T3CODE_HOME: resolvedBaseDir,
     };
+    if (resolvedCwd) {
+      output.T3CODE_CWD = resolvedCwd;
+    } else {
+      delete output.T3CODE_CWD;
+    }
 
     if (!isDesktopMode) {
       output.T3CODE_PORT = String(serverPort);
@@ -280,8 +289,12 @@ export function createDevRunnerEnv({
       delete output.T3CODE_NO_BROWSER;
     }
 
-    if (autoBootstrapProjectFromCwd !== undefined) {
-      output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD = autoBootstrapProjectFromCwd ? "1" : "0";
+    const effectiveAutoBootstrapProjectFromCwd =
+      autoBootstrapProjectFromCwd ?? (isDesktopMode && resolvedCwd ? true : undefined);
+    if (effectiveAutoBootstrapProjectFromCwd !== undefined) {
+      output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD = effectiveAutoBootstrapProjectFromCwd
+        ? "1"
+        : "0";
     } else {
       delete output.T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD;
     }
@@ -504,6 +517,7 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
     const env = yield* createDevRunnerEnv({
       mode: input.mode,
       baseEnv: hostEnvironment,
+      cwd: process.cwd(),
       serverOffset,
       webOffset,
       t3Home: input.t3Home,

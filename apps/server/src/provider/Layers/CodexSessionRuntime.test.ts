@@ -13,6 +13,7 @@ import {
   CODEX_PLAN_MODE_DEVELOPER_INSTRUCTIONS,
 } from "../CodexDeveloperInstructions.ts";
 import {
+  buildTurnSteerInput,
   buildTurnStartParams,
   hasConfiguredMcpServer,
   isRecoverableThreadResumeError,
@@ -191,6 +192,24 @@ describe("buildTurnStartParams", () => {
         },
       ],
     });
+  });
+});
+
+describe("buildTurnSteerInput", () => {
+  it("maps text and image input without turn-start-only settings", () => {
+    NodeAssert.deepStrictEqual(
+      buildTurnSteerInput({
+        input: "Adjust the current task",
+        attachments: [{ type: "image", url: "data:image/png;base64,abc" }],
+        model: "gpt-5.4",
+        effort: "high",
+        interactionMode: "default",
+      }),
+      [
+        { type: "text", text: "Adjust the current task" },
+        { type: "image", url: "data:image/png;base64,abc" },
+      ],
+    );
   });
 });
 

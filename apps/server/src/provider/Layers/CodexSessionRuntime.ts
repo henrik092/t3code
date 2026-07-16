@@ -398,6 +398,22 @@ export function buildTurnStartParams(input: {
   );
 }
 
+export function buildTurnSteerInput(
+  input: CodexSessionRuntimeSendTurnInput,
+): ReadonlyArray<EffectCodexSchema.V2TurnSteerParams__UserInput> {
+  const turnInput: Array<EffectCodexSchema.V2TurnSteerParams__UserInput> = [];
+  if (input.input) {
+    turnInput.push({
+      type: "text",
+      text: input.input,
+    });
+  }
+  for (const attachment of input.attachments ?? []) {
+    turnInput.push(attachment);
+  }
+  return turnInput;
+}
+
 function classifyCodexStderrLine(rawLine: string): { readonly message: string } | null {
   const line = rawLine.replaceAll(ANSI_ESCAPE_REGEX, "").trim();
   if (!line) {
@@ -1265,6 +1281,7 @@ export const makeCodexSessionRuntime = (
       sendTurn: (input) =>
         Effect.gen(function* () {
           const providerThreadId = yield* readProviderThreadId;
+          const currentSession = yield* Ref.get(sessionRef);
           if (hasConfiguredMcpServer(options.appServerArgs)) {
             yield* client.request("config/mcpServer/reload", undefined).pipe(
               Effect.catch((cause) =>
@@ -1274,9 +1291,24 @@ export const makeCodexSessionRuntime = (
               ),
             );
           }
-          const normalizedModel = normalizeCodexModelSlug(
-            input.model ?? (yield* Ref.get(sessionRef)).model,
-          );
+          if (currentSession.status === "running" && currentSession.activeTurnId) {
+            const response = yield* client.request("turn/steer", {
+              threadId: providerThreadId,
+              expectedTurnId: currentSession.activeTurnId,
+              input: buildTurnSteerInput(input),
+            });
+            const turnId = TurnId.make(response.turnId);
+            yield* updateSession(sessionRef, {
+              status: "running",
+              activeTurnId: turnId,
+            });
+            return {
+              threadId: options.threadId,
+              turnId,
+              resumeCursor: { threadId: providerThreadId },
+            } satisfies ProviderTurnStartResult;
+          }
+          const normalizedModel = normalizeCodexModelSlug(input.model ?? currentSession.model);
           const params = yield* buildTurnStartParams({
             threadId: providerThreadId,
             runtimeMode: options.runtimeMode,
