@@ -20,6 +20,10 @@ export default defineConfig({
     hookTimeout: 60_000,
     testTimeout: 60_000,
   },
+  staged: {
+    // Formatter only for now — no lint or typecheck on commit.
+    "*": "vp fmt",
+  },
   fmt: {
     ignorePatterns: [
       ".reference",
@@ -78,6 +82,7 @@ export default defineConfig({
       "react-hooks/exhaustive-deps": "off",
       "eslint/no-shadow": "off",
       "eslint/no-await-in-loop": "off",
+      "eslint/no-underscore-dangle": "off",
       "typescript/consistent-return": "off",
       "typescript/no-base-to-string": "off",
       "typescript/no-duplicate-type-constituents": "off",
