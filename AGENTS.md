@@ -53,6 +53,37 @@ This checkout is Henrik's fork of `pingdotgg/t3code`.
 Pull upstream updates with `git fetch upstream` and `git merge upstream/main`. Preserve local deployment
 fixes for the Proxmox T3 Code instance unless upstream has replaced them with equivalent behavior.
 
+### ACP Registry provider (Kimi)
+
+The fork adds a generic multi-instance `acpRegistry` provider driver that launches locally installed
+ACP agents (upstream ACP support is still in flight, so this lives only in the fork):
+
+- Server: `apps/server/src/provider/Drivers/AcpRegistryDriver.ts`,
+  `apps/server/src/provider/Layers/GenericAcpAdapter.ts`, `apps/server/src/provider/acp/`
+- Contracts: `AcpRegistrySettings` in `packages/contracts/src/settings.ts` (includes `modelNames`, a
+  hidden map from model slug to picker display name) and `packages/contracts/src/acp.ts`
+- Web: `AddProviderInstanceDialog*` and `ProviderSettingsForm*` under
+  `apps/web/src/components/settings/`; instance-only drivers must never assume a legacy
+  `settings.providers` slot (see `deriveProviderSettingsInstanceRows` in `SettingsPanels.logic.ts`)
+
+Henrik's live instance is the Kimi CLI (`agentId: "kimi"`, `kimi acp`, auth method `login`) stored in
+`~/.t3/userdata/settings.json` as `providerInstances.kimi`. Official nightlies do not know the driver;
+they parse it as an open slug, show the provider as unavailable, and leave the config untouched, so
+switching between nightly and fork builds is safe.
+
+### Desktop builds and launcher
+
+The desktop launcher `~/Applications/t3code` is a symlink to the active AppImage in `~/Applications`.
+The official nightly updater rewrites that symlink on update. Local fork builds are produced and
+activated with `~/Applications/update-t3code.sh` (wraps `scripts/update-local-fork.sh`):
+
+- `stage`: fetch/merge `upstream/main` on a throwaway candidate branch, run check/typecheck/tests,
+  build the AppImage, then fast-forward `main`. Aborts cleanly (main and launcher untouched) on merge
+  conflicts or failing gates. Requires a clean worktree on `main` and a local Node 24 runtime.
+- `activate`: atomically points the launcher at the last staged, checksum-verified build.
+- There is intentionally no `rollback` command; switch to the nightly by re-pointing the symlink or
+  letting the nightly updater do it.
+
 ## Local Environment
 
 - User: `rik`
