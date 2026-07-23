@@ -4,6 +4,7 @@ import {
   type ProviderInstanceConfig,
   type ProviderInstanceId,
   type ServerSettings,
+  type SidebarProjectGroupingMode,
   type UnifiedSettings,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
@@ -101,6 +102,39 @@ export function deriveProviderSettingsInstanceRows(input: {
   }
 
   return rows;
+}
+
+export function isProjectGroupingEnabled(mode: SidebarProjectGroupingMode): boolean {
+  return mode !== "separate";
+}
+
+export function projectGroupingModeFromToggle(
+  enabled: boolean,
+  lastEnabledMode: SidebarProjectGroupingMode = "repository",
+): SidebarProjectGroupingMode {
+  if (!enabled) return "separate";
+  return lastEnabledMode === "repository_path" ? "repository_path" : "repository";
+}
+
+const LAST_ENABLED_PROJECT_GROUPING_MODE_KEY = "t3code:last-enabled-project-grouping-mode";
+
+export function readLastEnabledProjectGroupingMode(): SidebarProjectGroupingMode {
+  try {
+    return localStorage.getItem(LAST_ENABLED_PROJECT_GROUPING_MODE_KEY) === "repository_path"
+      ? "repository_path"
+      : "repository";
+  } catch {
+    return "repository";
+  }
+}
+
+export function rememberEnabledProjectGroupingMode(mode: SidebarProjectGroupingMode): void {
+  if (mode === "separate") return;
+  try {
+    localStorage.setItem(LAST_ENABLED_PROJECT_GROUPING_MODE_KEY, mode);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
 }
 
 function collapseOtelSignalsUrl(input: {
