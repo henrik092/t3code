@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveWizardNavigation } from "./AddProviderInstanceDialog.logic";
+import {
+  acpRegistryAgentSelection,
+  filterAcpRegistryAgents,
+  resolveWizardNavigation,
+} from "./AddProviderInstanceDialog.logic";
+
+const registryAgents = [
+  {
+    id: "kimi",
+    name: "Kimi CLI",
+    version: "1.49.0",
+    description: "Kimi coding agent",
+    icon: "https://example.test/kimi.svg",
+    distribution: {},
+  },
+  {
+    id: "other",
+    name: "Another Agent",
+    version: "1.0.0",
+    description: "Independent ACP implementation",
+    distribution: {},
+  },
+] as const;
 
 describe("resolveWizardNavigation", () => {
   const invalidId = { instanceIdError: "Instance ID is required." };
@@ -40,5 +62,31 @@ describe("resolveWizardNavigation", () => {
   it("clamps requested steps to the wizard bounds", () => {
     expect(resolveWizardNavigation(2, 8, 3, validId)).toEqual({ kind: "navigate", step: 2 });
     expect(resolveWizardNavigation(0, -1, 3, invalidId)).toEqual({ kind: "navigate", step: 0 });
+  });
+
+  it("searches ACP Registry agents by id, name, and description", () => {
+    expect(filterAcpRegistryAgents(registryAgents, "KIMI").map((agent) => agent.id)).toEqual([
+      "kimi",
+    ]);
+    expect(filterAcpRegistryAgents(registryAgents, "independent").map((agent) => agent.id)).toEqual(
+      ["other"],
+    );
+    expect(filterAcpRegistryAgents(registryAgents, "")).toHaveLength(2);
+  });
+
+  it("builds the local Kimi K3 preset without duplicating its default model", () => {
+    expect(acpRegistryAgentSelection(registryAgents[0]!)).toEqual({
+      label: "Kimi K3",
+      instanceId: "kimi",
+      config: {
+        agentId: "kimi",
+        commandPath: "/home/rik/.kimi-code/bin/kimi",
+        args: ["acp"],
+        authMethodId: "login",
+        defaultModel: "kimi-code/k3",
+        customModels: ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"],
+        iconUrl: "https://example.test/kimi.svg",
+      },
+    });
   });
 });

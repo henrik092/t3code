@@ -129,6 +129,7 @@ const buildEntry = <R>(input: {
           instanceId,
           displayName: entry.displayName,
           accentColor: entry.accentColor,
+          iconUrl: entry.iconUrl,
           reason: `Driver '${entry.driver}' is not registered in this build.`,
         }),
       };
@@ -151,6 +152,7 @@ const buildEntry = <R>(input: {
           instanceId,
           displayName: entry.displayName,
           accentColor: entry.accentColor,
+          iconUrl: entry.iconUrl,
           reason: `Invalid config for instance '${rawInstanceId}': ${detail}`,
         }),
       };
@@ -170,6 +172,7 @@ const buildEntry = <R>(input: {
         instanceId,
         displayName: entry.displayName,
         accentColor: entry.accentColor,
+        iconUrl: entry.iconUrl,
         environment: entry.environment ?? [],
         enabled: entry.enabled ?? decodedConfigEnabled(typedConfig) ?? true,
         config: typedConfig,
@@ -189,6 +192,7 @@ const buildEntry = <R>(input: {
           instanceId,
           displayName: entry.displayName,
           accentColor: entry.accentColor,
+          iconUrl: entry.iconUrl,
           reason: `Driver '${entry.driver}' failed to create instance: ${createResult.failure.detail}`,
         }),
       };

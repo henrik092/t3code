@@ -29,6 +29,7 @@ const omitXAiPromptCompleteStopReason =
 const failLoadSession = process.env.T3_ACP_FAIL_LOAD_SESSION === "1";
 const emitLoadReplay = process.env.T3_ACP_EMIT_LOAD_REPLAY === "1";
 const hangLoadSessionAfterReplay = process.env.T3_ACP_HANG_LOAD_SESSION_AFTER_REPLAY === "1";
+const silentHangLoadSession = process.env.T3_ACP_SILENT_HANG_LOAD_SESSION === "1";
 const delayLoadSessionAfterReplay = process.env.T3_ACP_DELAY_LOAD_SESSION_AFTER_REPLAY === "1";
 const loadSessionDelayMs = Number(process.env.T3_ACP_LOAD_SESSION_DELAY_MS ?? "5000");
 const emitStaleXAiPromptCompleteBeforeSecondHang =
@@ -345,6 +346,9 @@ const program = Effect.gen(function* () {
       const requestedSessionId = String(request.sessionId ?? sessionId);
       if (failLoadSession) {
         return yield* AcpError.AcpRequestError.internalError("Mock load session failure");
+      }
+      if (silentHangLoadSession) {
+        return yield* Effect.never;
       }
       if (hangLoadSessionAfterReplay || delayLoadSessionAfterReplay) {
         emitLoadReplayNotifications(requestedSessionId);

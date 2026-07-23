@@ -29,6 +29,7 @@ import {
   parseSessionModeState,
   parseSessionUpdateEvent,
   sessionUpdateIsReplay,
+  syntheticLoadSessionResponseFromInitialize,
   waitForSessionLoadReplayIdle,
   type SessionLoadGate,
   type AcpParsedSessionEvent,
@@ -63,12 +64,15 @@ export interface AcpSessionRuntimeOptions {
   readonly resumeSessionId?: string;
   readonly sessionLoadTimeout?: Duration.Input;
   readonly sessionLoadReplayIdleGap?: Duration.Input;
+  readonly sessionLoadNoActivityGrace?: Duration.Input;
   readonly clientCapabilities?: EffectAcpSchema.InitializeRequest["clientCapabilities"];
   readonly clientInfo: {
     readonly name: string;
     readonly version: string;
   };
   readonly authMethodId: string;
+  /** Force-kill an ACP subprocess on scope close when it does not implement a graceful exit. */
+  readonly forceKillOnScopeClose?: boolean;
   readonly mcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
   readonly protocolLogging?: {
@@ -352,7 +356,6 @@ export const make = (
             }),
         ),
       );
-
     const acpContext = yield* Layer.build(
       EffectAcpClient.layerChildProcess(child, {
         ...(options.protocolLogging?.logIncoming !== undefined
@@ -366,6 +369,27 @@ export const make = (
     ).pipe(Effect.provideService(Scope.Scope, runtimeScope));
 
     const acp = yield* Effect.service(EffectAcpClient.AcpClient).pipe(Effect.provide(acpContext));
+
+    // Register this after the ACP transport has acquired its resources so this
+    // finalizer runs first (scope finalizers are LIFO). Give the agent a short
+    // graceful window to persist session state, then force-kill it if needed.
+    // Kimi 0.28.x traps SIGTERM but can otherwise keep scope shutdown waiting.
+    if (options.forceKillOnScopeClose) {
+      yield* Scope.addFinalizer(
+        runtimeScope,
+        Effect.sync(() => {
+          try {
+            process.kill(child.pid, "SIGTERM");
+          } catch {
+            // The process may already have exited normally.
+          }
+        }).pipe(
+          Effect.andThen(Effect.sleep("1 second")),
+          Effect.andThen(child.kill({ killSignal: "SIGKILL" })),
+          Effect.ignore,
+        ),
+      );
+    }
 
     yield* acp.handleSessionUpdate((notification) =>
       Effect.gen(function* () {
@@ -568,6 +592,9 @@ export const make = (
         const sessionLoadReplayIdleGap = Duration.fromInputUnsafe(
           options.sessionLoadReplayIdleGap ?? defaultSessionLoadReplayIdleGap,
         );
+        const sessionLoadNoActivityGrace = options.sessionLoadNoActivityGrace
+          ? Duration.fromInputUnsafe(options.sessionLoadNoActivityGrace)
+          : undefined;
 
         yield* Ref.set(
           sessionLoadGateRef,
@@ -590,10 +617,28 @@ export const make = (
           const idleFiber = yield* waitForSessionLoadReplayIdle({
             gateRef: sessionLoadGateRef,
           }).pipe(Effect.forkIn(runtimeScope));
-          const loaded = yield* Effect.raceFirst(
-            acp.agent.loadSession(loadPayload),
+          const loadFiber = yield* acp.agent
+            .loadSession(loadPayload)
+            .pipe(Effect.forkIn(runtimeScope));
+          const silentAgentFallback = sessionLoadNoActivityGrace
+            ? Effect.sleep(sessionLoadNoActivityGrace).pipe(
+                Effect.as(
+                  syntheticLoadSessionResponseFromInitialize(initializeResult, "rpc_silent_grace"),
+                ),
+              )
+            : Effect.never;
+          const replayOnlyFallback = Effect.raceFirst(
             Fiber.join(idleFiber),
+            silentAgentFallback,
           ).pipe(
+            // Prefer a real session/load response when both branches finish
+            // together; the replay-only branch exists for agents that never
+            // send the response at all. A bounded silent grace also supports
+            // agents such as Kimi 0.28.x, which load the session internally but
+            // emit neither replay notifications nor an RPC response.
+            Effect.tap(() => Effect.sleep("500 millis")),
+          );
+          const loaded = yield* Effect.raceFirst(Fiber.join(loadFiber), replayOnlyFallback).pipe(
             Effect.ensuring(Fiber.interrupt(idleFiber).pipe(Effect.ignore)),
             Effect.timeoutOption(sessionLoadTimeout),
             Effect.flatMap((result) =>
@@ -762,12 +807,15 @@ export const make = (
         Effect.flatMap((started) =>
           Effect.gen(function* () {
             const activePromptFiber = yield* Ref.get(activePromptFiberRef);
-            if (Option.isSome(activePromptFiber)) {
-              yield* Fiber.interrupt(activePromptFiber.value).pipe(Effect.ignore);
-            }
             yield* acp.agent
               .cancel({ sessionId: started.sessionId })
-              .pipe(Effect.ignore, Effect.forkIn(runtimeScope));
+              .pipe(Effect.timeoutOption("5 seconds"), Effect.ignore);
+            if (Option.isSome(activePromptFiber)) {
+              yield* Fiber.interrupt(activePromptFiber.value).pipe(
+                Effect.ignore,
+                Effect.forkIn(runtimeScope),
+              );
+            }
           }),
         ),
       ),

@@ -35,6 +35,33 @@ describe("AcpRuntimeModel", () => {
     });
   });
 
+  it("parses mode state from the standard mode config-option fallback", () => {
+    const modeState = parseSessionModeState({
+      sessionId: "session-1",
+      configOptions: [
+        {
+          id: "mode",
+          name: "Mode",
+          category: "mode",
+          type: "select",
+          currentValue: "default",
+          options: [
+            { value: "default", name: "Default" },
+            { value: "plan", name: "Plan", description: "Read-only planning" },
+          ],
+        },
+      ],
+    } satisfies EffectAcpSchema.NewSessionResponse);
+
+    expect(modeState).toEqual({
+      currentModeId: "default",
+      availableModes: [
+        { id: "default", name: "Default" },
+        { id: "plan", name: "Plan", description: "Read-only planning" },
+      ],
+    });
+  });
+
   it("extracts the model config id from typed ACP config options", () => {
     const modelConfigId = extractModelConfigId({
       sessionId: "session-1",

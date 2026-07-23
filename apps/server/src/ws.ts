@@ -78,6 +78,7 @@ import {
 } from "./observability/RpcInstrumentation.ts";
 import * as ProviderRegistry from "./provider/Services/ProviderRegistry.ts";
 import * as ProviderMaintenanceRunner from "./provider/providerMaintenanceRunner.ts";
+import { listAcpRegistryAgents } from "./provider/acp/AcpRegistryClient.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
@@ -303,6 +304,7 @@ const RPC_REQUIRED_SCOPE = new Map<string, AuthEnvironmentScope>([
   [WS_METHODS.serverGetSettings, AuthOrchestrationReadScope],
   [WS_METHODS.serverUpdateSettings, AuthOrchestrationOperateScope],
   [WS_METHODS.serverDiscoverSourceControl, AuthOrchestrationReadScope],
+  [WS_METHODS.serverListAcpRegistry, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetTraceDiagnostics, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetProcessDiagnostics, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetProcessResourceHistory, AuthOrchestrationReadScope],
@@ -1525,6 +1527,16 @@ const makeWsRpcLayer = (
           observeRpcEffect(
             WS_METHODS.serverDiscoverSourceControl,
             sourceControlDiscovery.discover,
+            {
+              "rpc.aggregate": "server",
+            },
+          ),
+        [WS_METHODS.serverListAcpRegistry]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.serverListAcpRegistry,
+            listAcpRegistryAgents(
+              input.registryUrl ? { registryUrl: input.registryUrl } : undefined,
+            ),
             {
               "rpc.aggregate": "server",
             },

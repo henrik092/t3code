@@ -605,6 +605,39 @@ describe("AcpSessionRuntime", () => {
     ),
   );
 
+  it.effect("continues session/load after a silent agent grace period", () =>
+    Effect.gen(function* () {
+      const runtime = yield* AcpSessionRuntime.AcpSessionRuntime;
+      const started = yield* runtime.start().pipe(Effect.timeout("2 seconds"));
+
+      expect(started.sessionId).toBe("mock-session-1");
+      expect(started.sessionSetupResult._meta).toMatchObject({
+        t3SessionLoadReady: "rpc_silent_grace",
+      });
+    }).pipe(
+      Effect.provide(
+        AcpSessionRuntime.layer({
+          authMethodId: "test",
+          spawn: {
+            command: mockAgentCommand,
+            args: mockAgentArgs,
+            env: {
+              T3_ACP_SILENT_HANG_LOAD_SESSION: "1",
+            },
+          },
+          cwd: process.cwd(),
+          resumeSessionId: "mock-session-1",
+          sessionLoadNoActivityGrace: "50 millis",
+          sessionLoadTimeout: "1 second",
+          clientInfo: { name: "t3-test", version: "0.0.0" },
+        }),
+      ),
+      Effect.scoped,
+      Effect.provide(NodeServices.layer),
+      TestClock.withLive,
+    ),
+  );
+
   it.effect("rejects invalid config option values before sending session/set_config_option", () => {
     const tempDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "acp-runtime-"));
     const requestLogPath = NodePath.join(tempDir, "requests.ndjson");

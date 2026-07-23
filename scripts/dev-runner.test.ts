@@ -153,6 +153,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {},
+          cwd: undefined,
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
@@ -173,6 +174,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: { T3CODE_NO_BROWSER: "0" },
+          cwd: undefined,
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
@@ -359,7 +361,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           serverOffset: 0,
           webOffset: 0,
           t3Home: undefined,
-          noBrowser: undefined,
+          browser: undefined,
           autoBootstrapProjectFromCwd: undefined,
           logWebSocketEvents: undefined,
           host: undefined,

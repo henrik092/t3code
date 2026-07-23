@@ -3,6 +3,7 @@
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { useMemo, useState } from "react";
 import {
+  type AcpRegistryAgent,
   ProviderInstanceId,
   ProviderDriverKind,
   type ProviderInstanceConfig,
@@ -11,8 +12,11 @@ import {
 import { usePrimarySettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { normalizeProviderAccentColor } from "../../providerInstances";
+import { usePrimaryEnvironment } from "../../state/environments";
+import { useEnvironmentQuery } from "../../state/query";
+import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
-import { ACPRegistryIcon, Gemini, GithubCopilotIcon, PiAgentIcon, type Icon } from "../Icons";
+import { Gemini, GithubCopilotIcon, PiAgentIcon, type Icon } from "../Icons";
 import {
   Dialog,
   DialogDescription,
@@ -29,7 +33,9 @@ import { DRIVER_OPTION_BY_VALUE, DRIVER_OPTIONS } from "./providerDriverMeta";
 import { ProviderSettingsForm, deriveProviderSettingsFields } from "./ProviderSettingsForm";
 import { AnimatedHeight } from "../AnimatedHeight";
 import {
+  acpRegistryAgentSelection,
   ADD_PROVIDER_WIZARD_STEPS,
+  filterAcpRegistryAgents,
   resolveWizardNavigation,
   type WizardNavigation,
 } from "./AddProviderInstanceDialog.logic";
@@ -67,6 +73,7 @@ function deriveInstanceId(driver: ProviderDriverKind, label: string): string {
 
 const INSTANCE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
+const ACP_REGISTRY_DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const DEFAULT_DRIVER_OPTION = DRIVER_OPTIONS[0]!;
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
 interface ComingSoonDriverOption {
@@ -85,11 +92,6 @@ const COMING_SOON_DRIVER_OPTIONS: readonly ComingSoonDriverOption[] = [
     value: ProviderDriverKind.make("gemini"),
     label: "Gemini",
     icon: Gemini,
-  },
-  {
-    value: ProviderDriverKind.make("acpRegistry"),
-    label: "ACP Registry",
-    icon: ACPRegistryIcon,
   },
   {
     value: ProviderDriverKind.make("piAgent"),
@@ -121,6 +123,7 @@ interface AddProviderInstanceDialogProps {
 export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderInstanceDialogProps) {
   const settings = usePrimarySettings();
   const updateSettings = useUpdatePrimarySettings();
+  const environmentId = usePrimaryEnvironment()?.environmentId ?? null;
 
   const [wizardStep, setWizardStep] = useState(0);
   const [driver, setDriver] = useState<ProviderDriverKind>(DEFAULT_DRIVER_KIND);
@@ -133,6 +136,20 @@ export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderIns
   // Errors are suppressed until the user has tried to submit once. After that
   // they update live so fixing the problem clears the message in place.
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [registrySearch, setRegistrySearch] = useState("kimi");
+  const selectedRegistryUrl = configByDriver[ACP_REGISTRY_DRIVER_KIND]?.registryUrl;
+
+  const registry = useEnvironmentQuery(
+    driver === ACP_REGISTRY_DRIVER_KIND && environmentId !== null
+      ? serverEnvironment.acpRegistry({
+          environmentId,
+          input:
+            typeof selectedRegistryUrl === "string" && selectedRegistryUrl.trim()
+              ? { registryUrl: selectedRegistryUrl.trim() }
+              : {},
+        })
+      : null,
+  );
 
   const existingIds = useMemo(
     () => new Set(Object.keys(settings.providerInstances ?? {})),
@@ -163,6 +180,18 @@ export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderIns
     });
   };
 
+  const filteredRegistryAgents = useMemo(() => {
+    const agents = registry.data?.agents ?? [];
+    return filterAcpRegistryAgents(agents, registrySearch);
+  }, [registry.data?.agents, registrySearch]);
+
+  const applyRegistryAgent = (agent: AcpRegistryAgent) => {
+    const selection = acpRegistryAgentSelection(agent);
+    if (selection.label) setLabel(selection.label);
+    if (selection.instanceId) setInstanceIdOverride(selection.instanceId);
+    setConfigDraft(selection.config);
+  };
+
   const applyWizardNavigation = (navigation: WizardNavigation) => {
     if (navigation.kind === "blocked") {
       setHasAttemptedSubmit(true);
@@ -185,12 +214,17 @@ export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderIns
     const config = configByDriver[driver] ?? {};
     const hasConfig = Object.keys(config).length > 0;
     const normalizedAccentColor = normalizeProviderAccentColor(accentColor);
+    const configuredIconUrl =
+      typeof config.iconUrl === "string" && config.iconUrl.trim().length > 0
+        ? config.iconUrl.trim()
+        : undefined;
 
     const nextInstance: ProviderInstanceConfig = {
       driver,
       enabled: true,
       ...(label.trim().length > 0 ? { displayName: label.trim() } : {}),
       ...(normalizedAccentColor ? { accentColor: normalizedAccentColor } : {}),
+      ...(configuredIconUrl ? { iconUrl: configuredIconUrl } : {}),
       ...(hasConfig ? { config } : {}),
     };
     // `ProviderInstanceId.make` revalidates the slug; we've already checked
@@ -391,6 +425,71 @@ export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderIns
 
               {driverSettingsFields.length > 0 ? (
                 <div className={cn("grid gap-4", wizardStep !== 2 && "hidden")}>
+                  {driver === ACP_REGISTRY_DRIVER_KIND ? (
+                    <div className="grid gap-2 rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-medium text-foreground">
+                            Official ACP Registry
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Select metadata for an agent that is already installed locally.
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={registry.refresh}
+                          disabled={registry.isPending}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                      <Input
+                        value={registrySearch}
+                        onChange={(event) => setRegistrySearch(event.target.value)}
+                        placeholder="Search ACP agents"
+                        spellCheck={false}
+                      />
+                      {registry.data?.status === "unavailable" || registry.error ? (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                          {registry.data?.message ?? registry.error}. Manual configuration remains
+                          available below.
+                        </p>
+                      ) : null}
+                      <div className="max-h-44 space-y-1.5 overflow-y-auto">
+                        {filteredRegistryAgents.map((agent) => {
+                          const selected = configDraft.agentId === agent.id;
+                          return (
+                            <button
+                              key={agent.id}
+                              type="button"
+                              className={cn(
+                                "w-full rounded-md border px-2.5 py-2 text-left transition",
+                                selected
+                                  ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                  : "border-border hover:bg-muted/50",
+                              )}
+                              onClick={() => applyRegistryAgent(agent)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                                  {agent.name}
+                                </span>
+                                <Badge variant="outline" size="sm">
+                                  {agent.version}
+                                </Badge>
+                              </div>
+                              <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                                {agent.description}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                   <ProviderSettingsForm
                     definition={driverOption}
                     value={configDraft}

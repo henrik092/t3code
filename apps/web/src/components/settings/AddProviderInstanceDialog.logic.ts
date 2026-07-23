@@ -1,3 +1,5 @@
+import type { AcpRegistryAgent } from "@t3tools/contracts";
+
 export type WizardNavigation =
   | { readonly kind: "navigate"; readonly step: number }
   | { readonly kind: "blocked"; readonly step: number; readonly error: string };
@@ -5,6 +7,41 @@ export type WizardNavigation =
 const IDENTITY_STEP = 1;
 
 export const ADD_PROVIDER_WIZARD_STEPS = ["Driver", "Identity", "Config"] as const;
+
+export function filterAcpRegistryAgents(
+  agents: ReadonlyArray<AcpRegistryAgent>,
+  search: string,
+): ReadonlyArray<AcpRegistryAgent> {
+  const query = search.trim().toLocaleLowerCase();
+  if (!query) return agents;
+  return agents.filter((agent) =>
+    [agent.id, agent.name, agent.description].some((value) =>
+      value.toLocaleLowerCase().includes(query),
+    ),
+  );
+}
+
+export function acpRegistryAgentSelection(agent: AcpRegistryAgent): {
+  readonly label?: string;
+  readonly instanceId?: string;
+  readonly config: Record<string, unknown>;
+} {
+  const isKimi = agent.id === "kimi";
+  return {
+    ...(isKimi ? { label: "Kimi K3", instanceId: "kimi" } : {}),
+    config: {
+      agentId: agent.id,
+      commandPath: isKimi ? "/home/rik/.kimi-code/bin/kimi" : "",
+      args: isKimi ? ["acp"] : [],
+      authMethodId: isKimi ? "login" : "",
+      defaultModel: isKimi ? "kimi-code/k3" : "default",
+      customModels: isKimi
+        ? ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"]
+        : [],
+      ...(agent.icon ? { iconUrl: agent.icon } : {}),
+    },
+  };
+}
 
 /**
  * Resolve navigation within the add-provider wizard.

@@ -298,6 +298,10 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:process-resource-history",
       tag: WS_METHODS.serverGetProcessResourceHistory,
     }),
+    acpRegistry: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:acp-registry",
+      tag: WS_METHODS.serverListAcpRegistry,
+    }),
     configProjection,
     welcome: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:welcome",

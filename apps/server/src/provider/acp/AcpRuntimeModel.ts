@@ -160,14 +160,21 @@ export function parseSessionModeState(
   sessionResponse: AcpSessionSetupResponse,
 ): AcpSessionModeState | undefined {
   const modes = sessionResponse.modes;
-  if (!modes) return undefined;
-  const currentModeId = modes.currentModeId.trim();
+  const modeConfig = sessionResponse.configOptions?.find(
+    (option): option is Extract<EffectAcpSchema.SessionConfigOption, { readonly type: "select" }> =>
+      option.category === "mode" && option.type === "select",
+  );
+  const currentModeId = (modes?.currentModeId ?? modeConfig?.currentValue ?? "").trim();
   if (!currentModeId) {
     return undefined;
   }
   const availableModes: Array<AcpSessionMode> = [];
-  for (const mode of modes.availableModes) {
-    const id = mode.id.trim();
+  const modeEntries =
+    modes?.availableModes ??
+    modeConfig?.options.flatMap((entry) => ("value" in entry ? [entry] : entry.options)) ??
+    [];
+  for (const mode of modeEntries) {
+    const id = ("id" in mode ? mode.id : mode.value).trim();
     const name = mode.name.trim();
     if (!id || !name) {
       continue;
@@ -489,6 +496,7 @@ export const waitForSessionLoadReplayIdle = (input: {
 
 export function syntheticLoadSessionResponseFromInitialize(
   initializeResult: EffectAcpSchema.InitializeResponse,
+  readyReason: "replay_idle" | "rpc_silent_grace" = "replay_idle",
 ): EffectAcpSchema.LoadSessionResponse {
   const meta = initializeResult._meta;
   const modelState = isRecord(meta) ? meta.modelState : undefined;
@@ -500,7 +508,7 @@ export function syntheticLoadSessionResponseFromInitialize(
     ...(models ? { models } : {}),
     ...(modes ? { modes } : {}),
     _meta: {
-      t3SessionLoadReady: "replay_idle",
+      t3SessionLoadReady: readyReason,
     },
   };
 }

@@ -127,6 +127,13 @@ export class ServerSettingsService extends Context.Service<
 
     /** Stream of settings change events. */
     readonly streamChanges: Stream.Stream<ServerSettings>;
+
+    /** Acquire the change subscription before forking a lossless consumer loop. */
+    readonly subscribeChanges?: Effect.Effect<
+      PubSub.Subscription<ServerSettings>,
+      never,
+      Scope.Scope
+    >;
   }
 >()("t3/serverSettings/ServerSettingsService") {
   /** @deprecated Import and use `layerTest` from this module. */
@@ -595,6 +602,9 @@ const make = Effect.gen(function* () {
         ),
         Stream.map(resolveTextGenerationProvider),
       );
+    },
+    get subscribeChanges() {
+      return PubSub.subscribe(changesPubSub);
     },
   } satisfies ServerSettingsService["Service"];
 });

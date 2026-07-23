@@ -128,7 +128,12 @@ const makeBinaryPathSetting = (fallback: string) =>
     Schema.withDecodingDefault(Effect.succeed(fallback)),
   );
 
-export type ProviderSettingsFormControl = "text" | "password" | "textarea" | "switch";
+export type ProviderSettingsFormControl =
+  | "text"
+  | "password"
+  | "textarea"
+  | "string-list"
+  | "switch";
 
 export interface ProviderSettingsFormAnnotation {
   readonly control?: ProviderSettingsFormControl | undefined;
@@ -375,6 +380,106 @@ export const OpenCodeSettings = makeProviderSettingsSchema(
   },
 );
 export type OpenCodeSettings = typeof OpenCodeSettings.Type;
+
+export const DEFAULT_ACP_REGISTRY_URL =
+  "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
+
+export const AcpRegistrySettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    registryUrl: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed(DEFAULT_ACP_REGISTRY_URL)),
+      Schema.annotateKey({
+        title: "Registry URL",
+        description: "Metadata source only. T3 Code never downloads or installs agent binaries.",
+        providerSettingsForm: { placeholder: DEFAULT_ACP_REGISTRY_URL, clearWhenEmpty: "persist" },
+      }),
+    ),
+    agentId: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Registry agent ID",
+        description: "Agent identifier from the official ACP Registry, for example 'kimi'.",
+        providerSettingsForm: { placeholder: "kimi", clearWhenEmpty: "omit" },
+      }),
+    ),
+    commandPath: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Binary path",
+        description: "Absolute path or command for an already installed ACP agent.",
+        providerSettingsForm: { placeholder: "/path/to/agent", clearWhenEmpty: "omit" },
+      }),
+    ),
+    args: Schema.Array(Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+      Schema.annotateKey({
+        title: "Launch arguments",
+        description: "One argument per line. Shell expansion is not used.",
+        providerSettingsForm: {
+          control: "string-list",
+          placeholder: "acp",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    authMethodId: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("login")),
+      Schema.annotateKey({
+        title: "Authentication method",
+        description: "ACP authentication method ID exposed by the agent.",
+        providerSettingsForm: { placeholder: "login", clearWhenEmpty: "persist" },
+      }),
+    ),
+    defaultModel: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("default")),
+      Schema.annotateKey({
+        title: "Default model",
+        description: "Model selected when a new thread starts with this instance.",
+        providerSettingsForm: { placeholder: "default", clearWhenEmpty: "persist" },
+      }),
+    ),
+    customModels: Schema.Array(Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+      Schema.annotateKey({
+        title: "Additional models",
+        description: "One model identifier per line.",
+        providerSettingsForm: {
+          control: "string-list",
+          placeholder: "vendor/model-name",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    iconUrl: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Icon URL",
+        description: "Optional icon from registry metadata or another trusted URL.",
+        providerSettingsForm: {
+          placeholder: "https://example.com/icon.svg",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+  },
+  {
+    order: [
+      "registryUrl",
+      "agentId",
+      "commandPath",
+      "args",
+      "authMethodId",
+      "defaultModel",
+      "customModels",
+      "iconUrl",
+    ],
+  },
+);
+export type AcpRegistrySettings = typeof AcpRegistrySettings.Type;
 
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),

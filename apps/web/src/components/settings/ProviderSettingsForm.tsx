@@ -117,6 +117,14 @@ export function readProviderConfigString(config: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+export function readProviderConfigStringList(config: unknown, key: string): ReadonlyArray<string> {
+  if (config === null || typeof config !== "object") return [];
+  const value = (config as Record<string, unknown>)[key];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 export function readProviderConfigBoolean(
   config: unknown,
   key: string,
@@ -150,6 +158,25 @@ export function nextProviderConfigWithFieldValue(
     delete base[field.key];
   } else {
     base[field.key] = value;
+  }
+  return Object.keys(base).length > 0 ? base : undefined;
+}
+
+export function nextProviderConfigWithStringList(
+  config: unknown,
+  field: ProviderSettingsFieldModel,
+  value: string,
+): Record<string, unknown> | undefined {
+  const base: Record<string, unknown> =
+    config !== null && typeof config === "object" ? { ...(config as Record<string, unknown>) } : {};
+  const items = value
+    .split(/\r?\n/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  if (field.clearWhenEmpty === "omit" && items.length === 0) {
+    delete base[field.key];
+  } else {
+    base[field.key] = items;
   }
   return Object.keys(base).length > 0 ? base : undefined;
 }
@@ -228,6 +255,27 @@ function ProviderSettingsFieldRow({
             value={readProviderConfigString(value, field.key)}
             onChange={(event) =>
               onChange(nextProviderConfigWithFieldValue(value, field, event.target.value))
+            }
+            placeholder={field.placeholder}
+            spellCheck={false}
+          />
+          {description}
+        </label>
+      </FieldFrame>
+    );
+  }
+
+  if (field.control === "string-list") {
+    return (
+      <FieldFrame variant={variant}>
+        <label htmlFor={inputId} className={cn(variant === "card" && "block")}>
+          {label}
+          <Textarea
+            id={inputId}
+            className={cn(variant === "card" && "mt-1.5")}
+            value={readProviderConfigStringList(value, field.key).join("\n")}
+            onChange={(event) =>
+              onChange(nextProviderConfigWithStringList(value, field, event.target.value))
             }
             placeholder={field.placeholder}
             spellCheck={false}

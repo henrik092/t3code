@@ -5,6 +5,7 @@ import { DRIVER_OPTION_BY_VALUE } from "./providerDriverMeta";
 import {
   deriveProviderSettingsFields,
   nextProviderConfigWithFieldValue,
+  nextProviderConfigWithStringList,
   readProviderConfigBoolean,
   readProviderConfigString,
 } from "./ProviderSettingsForm";
@@ -34,6 +35,38 @@ describe("ProviderSettingsForm helpers", () => {
       label: "Server password",
       description: "Stored in plain text on disk.",
       control: "password",
+    });
+  });
+
+  it("exposes the ACP binary, model picker, and list fields", () => {
+    const acp = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("acpRegistry")];
+    expect(acp).toBeDefined();
+    expect(deriveProviderSettingsFields(acp!).map((field) => [field.key, field.control])).toEqual([
+      ["registryUrl", "text"],
+      ["agentId", "text"],
+      ["commandPath", "text"],
+      ["args", "string-list"],
+      ["authMethodId", "text"],
+      ["defaultModel", "text"],
+      ["customModels", "string-list"],
+      ["iconUrl", "text"],
+    ]);
+  });
+
+  it("normalizes newline-separated additional models and preserves unknown fields", () => {
+    const next = nextProviderConfigWithStringList(
+      { forkOwned: 1 },
+      {
+        key: "customModels",
+        control: "string-list",
+        label: "Additional models",
+        clearWhenEmpty: "omit",
+      },
+      " kimi-code/kimi-for-coding \n\n kimi-code/kimi-for-coding-highspeed ",
+    );
+    expect(next).toEqual({
+      forkOwned: 1,
+      customModels: ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"],
     });
   });
 

@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 
 import { ProviderInstanceId } from "./providerInstance.ts";
 import {
+  AcpRegistrySettings,
   ClientSettingsSchema,
   ClientSettingsPatch,
   DEFAULT_SERVER_SETTINGS,
@@ -15,6 +16,38 @@ const decodeClientSettingsPatch = Schema.decodeUnknownSync(ClientSettingsPatch);
 const decodeServerSettings = Schema.decodeUnknownSync(ServerSettings);
 const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
+const decodeAcpRegistrySettings = Schema.decodeUnknownSync(AcpRegistrySettings);
+
+describe("AcpRegistrySettings", () => {
+  it("decodes the manual Kimi configuration and applies safe defaults", () => {
+    expect(
+      decodeAcpRegistrySettings({
+        agentId: " kimi ",
+        commandPath: " /home/rik/.kimi-code/bin/kimi ",
+        args: ["acp"],
+        defaultModel: " kimi-code/k3 ",
+        customModels: ["kimi-code/kimi-for-coding"],
+      }),
+    ).toMatchObject({
+      enabled: true,
+      agentId: "kimi",
+      commandPath: "/home/rik/.kimi-code/bin/kimi",
+      args: ["acp"],
+      authMethodId: "login",
+      defaultModel: "kimi-code/k3",
+      customModels: ["kimi-code/kimi-for-coding"],
+    });
+  });
+
+  it("defaults to a manual provider that does not spawn without a command", () => {
+    expect(decodeAcpRegistrySettings({})).toMatchObject({
+      enabled: true,
+      commandPath: "",
+      args: [],
+      defaultModel: "default",
+    });
+  });
+});
 
 describe("ClientSettings word wrap", () => {
   it("defaults word wrap on", () => {

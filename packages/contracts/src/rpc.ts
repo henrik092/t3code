@@ -14,6 +14,7 @@ import {
   FilesystemBrowseError,
 } from "./filesystem.ts";
 import { AssetAccessError, AssetCreateUrlInput, AssetCreateUrlResult } from "./assets.ts";
+import { AcpRegistryListInput, AcpRegistryListResult } from "./acp.ts";
 import {
   GitActionProgressEvent,
   VcsSwitchRefInput,
@@ -214,6 +215,7 @@ export const WS_METHODS = {
   serverGetSettings: "server.getSettings",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
+  serverListAcpRegistry: "server.listAcpRegistry",
   serverGetTraceDiagnostics: "server.getTraceDiagnostics",
   serverGetProcessDiagnostics: "server.getProcessDiagnostics",
   serverGetProcessResourceHistory: "server.getProcessResourceHistory",
@@ -304,6 +306,12 @@ export const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSetting
 export const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourceControl, {
   payload: Schema.Struct({}),
   success: SourceControlDiscoveryResult,
+  error: EnvironmentAuthorizationError,
+});
+
+export const WsServerListAcpRegistryRpc = Rpc.make(WS_METHODS.serverListAcpRegistry, {
+  payload: AcpRegistryListInput,
+  success: AcpRegistryListResult,
   error: EnvironmentAuthorizationError,
 });
 
@@ -709,6 +717,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetSettingsRpc,
   WsServerUpdateSettingsRpc,
   WsServerDiscoverSourceControlRpc,
+  WsServerListAcpRegistryRpc,
   WsServerGetTraceDiagnosticsRpc,
   WsServerGetProcessDiagnosticsRpc,
   WsServerGetProcessResourceHistoryRpc,

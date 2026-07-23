@@ -297,6 +297,9 @@ function makeMutableServerSettingsService(
       get streamChanges() {
         return Stream.fromPubSub(changes);
       },
+      get subscribeChanges() {
+        return PubSub.subscribe(changes);
+      },
     } satisfies ServerSettingsModule.ServerSettingsService["Service"];
   });
 }
