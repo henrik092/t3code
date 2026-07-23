@@ -137,7 +137,7 @@ describe("local T3 Code fork updater", () => {
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(fixture.oldBuild);
   });
 
-  it("stages, atomically activates, and rolls back a verified AppImage", () => {
+  it("stages and atomically activates a verified AppImage", () => {
     const fixture = makeFixture();
     const stage = runUpdate(fixture, "stage");
     expect(stage.status, stage.stderr).toBe(0);
@@ -153,8 +153,6 @@ describe("local T3 Code fork updater", () => {
 
     expect(runUpdate(fixture, "activate").status).toBe(0);
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(candidate);
-    expect(runUpdate(fixture, "rollback").status).toBe(0);
-    expect(NodeFS.realpathSync(fixture.launcher)).toBe(fixture.oldBuild);
   });
 
   it("never overwrites an existing active build for the same commit", () => {
@@ -176,17 +174,16 @@ describe("local T3 Code fork updater", () => {
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(activeBuild);
   });
 
-  it("refuses rollback when the previous build checksum changed", () => {
+  it("rejects the removed rollback action without touching the launcher", () => {
     const fixture = makeFixture();
     expect(runUpdate(fixture, "stage").status).toBe(0);
     expect(runUpdate(fixture, "activate").status).toBe(0);
     const activeBuild = NodeFS.realpathSync(fixture.launcher);
-    NodeFS.writeFileSync(fixture.oldBuild, "tampered");
 
     const rollback = runUpdate(fixture, "rollback");
 
     expect(rollback.status).not.toBe(0);
-    expect(rollback.stderr).toContain("Prüfsumme des vorherigen Builds stimmt nicht");
+    expect(rollback.stderr).toContain("Aufruf");
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(activeBuild);
   });
 });

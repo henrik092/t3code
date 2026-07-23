@@ -50,15 +50,11 @@ atomic_link() {
 write_status() {
   local candidate=$1
   local checksum=$2
-  local previous=$3
-  local previous_checksum=$4
-  local commit=$5
+  local commit=$3
   local temporary_status="$STATUS_PATH.next.$$"
   {
     printf 'candidate\t%s\n' "$candidate"
     printf 'sha256\t%s\n' "$checksum"
-    printf 'previous\t%s\n' "$previous"
-    printf 'previous_sha256\t%s\n' "$previous_checksum"
     printf 'commit\t%s\n' "$commit"
   } > "$temporary_status"
   mv -f -- "$temporary_status" "$STATUS_PATH"
@@ -121,7 +117,7 @@ stage_update() {
   env -u GITHUB_REPOSITORY -u T3CODE_DESKTOP_UPDATE_REPOSITORY \
     T3CODE_DESKTOP_OUTPUT_DIR="$build_dir" bash -lc "$BUILD_COMMAND"
 
-  local artifact_count artifact commit short_commit destination checksum previous previous_checksum
+  local artifact_count artifact commit short_commit destination checksum
   artifact_count=$(find "$build_dir" -maxdepth 1 -type f -name '*.AppImage' -printf '.' | wc -c)
   [[ "$artifact_count" -eq 1 ]] || die "Erwartete genau ein AppImage, gefunden: $artifact_count"
   artifact=$(find "$build_dir" -maxdepth 1 -type f -name '*.AppImage' -print -quit)
@@ -142,13 +138,8 @@ stage_update() {
     mv -T -- "$staged_temp" "$destination"
   fi
   staged_temp=""
-  previous=$(readlink -f -- "$LAUNCHER_PATH" 2>/dev/null || true)
-  previous_checksum=""
-  if [[ -n "$previous" && -f "$previous" ]]; then
-    previous_checksum=$(sha256sum -- "$previous" | cut -d' ' -f1)
-  fi
 
-  write_status "$destination" "$checksum" "$previous" "$previous_checksum" "$commit"
+  write_status "$destination" "$checksum" "$commit"
 
   git switch main
   git merge --ff-only "$candidate_branch"
@@ -175,33 +166,8 @@ activate_update() {
   printf 'T3 Code aktiviert: %s\n' "$candidate"
 }
 
-rollback_update() {
-  local previous expected_previous actual_previous current candidate checksum commit current_checksum
-  previous=$(read_status_value previous) || die "Kein vorheriger Build gespeichert."
-  expected_previous=$(read_status_value previous_sha256) || die "Prüfsumme des vorherigen Builds fehlt."
-  [[ -n "$previous" ]] || die "Kein vorheriger Launcher-Zielpfad gespeichert."
-  [[ -f "$previous" ]] || die "Vorheriger Build nicht gefunden: $previous"
-  actual_previous=$(sha256sum -- "$previous" 2>/dev/null | cut -d' ' -f1) || \
-    die "Vorheriger Build ist nicht lesbar: $previous"
-  [[ "$actual_previous" == "$expected_previous" ]] || \
-    die "Prüfsumme des vorherigen Builds stimmt nicht."
-  current=$(readlink -f -- "$LAUNCHER_PATH" 2>/dev/null || true)
-  atomic_link "$previous"
-
-  candidate=$(read_status_value candidate 2>/dev/null || true)
-  checksum=$(read_status_value sha256 2>/dev/null || true)
-  commit=$(read_status_value commit 2>/dev/null || true)
-  current_checksum=""
-  if [[ -n "$current" && -f "$current" ]]; then
-    current_checksum=$(sha256sum -- "$current" | cut -d' ' -f1)
-  fi
-  write_status "$candidate" "$checksum" "$current" "$current_checksum" "$commit"
-  printf 'Rollback aktiviert: %s\n' "$previous"
-}
-
 case ${1:-} in
   stage) stage_update ;;
   activate) activate_update ;;
-  rollback) rollback_update ;;
-  *) die "Aufruf: $0 {stage|activate|rollback}" ;;
+  *) die "Aufruf: $0 {stage|activate}" ;;
 esac
