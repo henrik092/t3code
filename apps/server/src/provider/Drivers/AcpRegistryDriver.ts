@@ -3,6 +3,7 @@ import {
   ProviderDriverKind,
   TextGenerationError,
   type ServerProvider,
+  type ServerProviderModel,
 } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -75,6 +76,16 @@ function withIdentity(input: {
   });
 }
 
+export function applyAcpModelDisplayNames(
+  models: ReadonlyArray<ServerProviderModel>,
+  modelNames: Readonly<Record<string, string>>,
+): ReadonlyArray<ServerProviderModel> {
+  return models.map((model) => {
+    const name = modelNames[model.slug];
+    return name !== undefined && name !== model.name ? { ...model, name } : model;
+  });
+}
+
 function initialSnapshot(settings: AcpRegistrySettings, checkedAt: string): ServerProviderDraft {
   const command = settings.commandPath.trim();
   const enabled = settings.enabled && command.length > 0;
@@ -87,18 +98,21 @@ function initialSnapshot(settings: AcpRegistrySettings, checkedAt: string): Serv
     },
     enabled,
     checkedAt,
-    models: providerModelsFromSettings(
-      [
-        {
-          slug: defaultModel,
-          name: defaultModel === "default" ? "Default" : defaultModel,
-          isCustom: false,
-          isDefault: true,
-          capabilities: null,
-        },
-      ],
-      settings.customModels,
-      { optionDescriptors: [] },
+    models: applyAcpModelDisplayNames(
+      providerModelsFromSettings(
+        [
+          {
+            slug: defaultModel,
+            name: defaultModel === "default" ? "Default" : defaultModel,
+            isCustom: false,
+            isDefault: true,
+            capabilities: null,
+          },
+        ],
+        settings.customModels,
+        { optionDescriptors: [] },
+      ),
+      settings.modelNames,
     ),
     probe: {
       installed: enabled,

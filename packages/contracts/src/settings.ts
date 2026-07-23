@@ -454,6 +454,14 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
         },
       }),
     ),
+    modelNames: Schema.Record(Schema.String, Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed({})),
+      Schema.annotateKey({
+        title: "Model display names",
+        description: "Optional display names keyed by model identifier.",
+        providerSettingsForm: { hidden: true },
+      }),
+    ),
     iconUrl: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({

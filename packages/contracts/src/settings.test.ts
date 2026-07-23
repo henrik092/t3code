@@ -27,6 +27,10 @@ describe("AcpRegistrySettings", () => {
         args: ["acp"],
         defaultModel: " kimi-code/k3 ",
         customModels: ["kimi-code/kimi-for-coding"],
+        modelNames: {
+          "kimi-code/k3": "K3",
+          "kimi-code/kimi-for-coding": "K2.7 Coding",
+        },
       }),
     ).toMatchObject({
       enabled: true,
@@ -36,6 +40,10 @@ describe("AcpRegistrySettings", () => {
       authMethodId: "login",
       defaultModel: "kimi-code/k3",
       customModels: ["kimi-code/kimi-for-coding"],
+      modelNames: {
+        "kimi-code/k3": "K3",
+        "kimi-code/kimi-for-coding": "K2.7 Coding",
+      },
     });
   });
 
@@ -45,6 +53,7 @@ describe("AcpRegistrySettings", () => {
       commandPath: "",
       args: [],
       defaultModel: "default",
+      modelNames: {},
     });
   });
 });
