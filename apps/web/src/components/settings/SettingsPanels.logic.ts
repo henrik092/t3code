@@ -1,11 +1,107 @@
-import type {
-  ProviderDriverKind,
-  ProviderInstanceConfig,
-  ProviderInstanceId,
-  ServerSettings,
-  UnifiedSettings,
+import {
+  defaultInstanceIdForDriver,
+  type ProviderDriverKind,
+  type ProviderInstanceConfig,
+  type ProviderInstanceId,
+  type ServerSettings,
+  type UnifiedSettings,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
+import * as Equal from "effect/Equal";
+
+export interface ProviderSettingsInstanceRow {
+  readonly instanceId: ProviderInstanceId;
+  readonly instance: ProviderInstanceConfig;
+  readonly driver: ProviderDriverKind;
+  readonly isDefault: boolean;
+  readonly isDirty?: boolean;
+}
+
+/**
+ * Build the provider cards shown in settings without assuming every driver
+ * has a legacy `settings.providers` slot. Package-style drivers such as ACP
+ * Registry only exist as provider instances, while the original built-ins
+ * still synthesize a default card from their legacy settings.
+ */
+export function deriveProviderSettingsInstanceRows(input: {
+  readonly settings: Pick<UnifiedSettings, "providers" | "providerInstances">;
+  readonly visibleDrivers: ReadonlyArray<ProviderDriverKind>;
+}): ReadonlyArray<ProviderSettingsInstanceRow> {
+  const instancesByDriver = new Map<
+    ProviderDriverKind,
+    Array<[ProviderInstanceId, ProviderInstanceConfig]>
+  >();
+  for (const [rawId, instance] of Object.entries(input.settings.providerInstances ?? {})) {
+    const list = instancesByDriver.get(instance.driver) ?? [];
+    list.push([rawId as ProviderInstanceId, instance]);
+    instancesByDriver.set(instance.driver, list);
+  }
+
+  type LegacyProviderSettings = UnifiedSettings["providers"][keyof UnifiedSettings["providers"]];
+  const legacyProviders = input.settings.providers as Record<
+    string,
+    LegacyProviderSettings | undefined
+  >;
+  const defaultLegacyProviders = DEFAULT_UNIFIED_SETTINGS.providers as Record<
+    string,
+    LegacyProviderSettings | undefined
+  >;
+  const visibleDriverSet = new Set(input.visibleDrivers);
+  const defaultSlotIds = new Set(
+    input.visibleDrivers.map((driver) => String(defaultInstanceIdForDriver(driver))),
+  );
+  const rows: ProviderSettingsInstanceRow[] = [];
+
+  for (const driver of input.visibleDrivers) {
+    const defaultInstanceId = defaultInstanceIdForDriver(driver);
+    const explicitInstance = input.settings.providerInstances?.[defaultInstanceId];
+    const legacyConfig = legacyProviders[driver];
+    const defaultLegacyConfig = defaultLegacyProviders[driver];
+
+    if (explicitInstance !== undefined) {
+      rows.push({
+        instanceId: defaultInstanceId,
+        instance: explicitInstance,
+        driver,
+        // Only legacy-backed defaults are non-deletable/resettable. An
+        // instance-only driver may legitimately use its driver kind as an ID.
+        isDefault: defaultLegacyConfig !== undefined,
+        isDirty: true,
+      });
+    } else if (legacyConfig !== undefined && defaultLegacyConfig !== undefined) {
+      rows.push({
+        instanceId: defaultInstanceId,
+        instance: {
+          driver,
+          enabled: legacyConfig.enabled,
+          config: legacyConfig,
+        },
+        driver,
+        isDefault: true,
+        isDirty: !Equal.equals(legacyConfig, defaultLegacyConfig),
+      });
+    }
+
+    for (const [instanceId, instance] of instancesByDriver.get(driver) ?? []) {
+      if (instanceId === defaultInstanceId) continue;
+      rows.push({ instanceId, instance, driver: instance.driver, isDefault: false });
+    }
+  }
+
+  for (const [driver, instances] of instancesByDriver) {
+    if (visibleDriverSet.has(driver)) continue;
+    for (const [instanceId, instance] of instances) {
+      rows.push({
+        instanceId,
+        instance,
+        driver: instance.driver,
+        isDefault: defaultSlotIds.has(String(instanceId)),
+      });
+    }
+  }
+
+  return rows;
+}
 
 function collapseOtelSignalsUrl(input: {
   readonly tracesUrl: string;
