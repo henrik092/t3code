@@ -79,10 +79,14 @@ activated with `~/Applications/update-t3code.sh` (wraps `scripts/update-local-fo
 
 - `stage`: fetch/merge `upstream/main` on a throwaway candidate branch, run check/typecheck/tests,
   build the AppImage, then fast-forward `main`. Aborts cleanly (main and launcher untouched) on merge
-  conflicts or failing gates. Requires a clean worktree on `main` and a local Node 24 runtime.
+  conflicts or failing gates. Requires a clean worktree on `main` and a local Node 24 runtime. If the
+  merged head matches the last staged commit, it exits early ("Bereits aktuell") without rebuilding.
 - `activate`: atomically points the launcher at the last staged, checksum-verified build.
 - There is intentionally no `rollback` command; switch to the nightly by re-pointing the symlink or
   letting the nightly updater do it.
+- The fork build is the daily driver. A systemd user timer (`t3code-fork-update.timer`, nightly at
+  03:47, `Persistent=true`) runs `stage` followed by `activate`; check its runs with
+  `journalctl --user -u t3code-fork-update.service`.
 
 ## Local Environment
 

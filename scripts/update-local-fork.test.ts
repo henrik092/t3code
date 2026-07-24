@@ -155,7 +155,7 @@ describe("local T3 Code fork updater", () => {
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(candidate);
   });
 
-  it("never overwrites an existing active build for the same commit", () => {
+  it("does not rebuild or touch the active build when the merged head is unchanged", () => {
     const fixture = makeFixture();
     expect(runUpdate(fixture, "stage").status).toBe(0);
     expect(runUpdate(fixture, "activate").status).toBe(0);
@@ -168,10 +168,21 @@ describe("local T3 Code fork updater", () => {
         'printf changed > "$T3CODE_DESKTOP_OUTPUT_DIR/T3-Code-test-x86_64.AppImage"',
     });
 
-    expect(restage.status).not.toBe(0);
-    expect(restage.stderr).toContain("abweichendem Inhalt");
+    expect(restage.status, restage.stderr).toBe(0);
+    expect(restage.stdout).toContain("Bereits aktuell");
     expect(NodeFS.readFileSync(activeBuild)).toEqual(before);
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(activeBuild);
+  });
+
+  it("skips the build when the merged head matches the last staged commit", () => {
+    const fixture = makeFixture();
+    expect(runUpdate(fixture, "stage").status).toBe(0);
+
+    const restage = runUpdate(fixture, "stage");
+
+    expect(restage.status, restage.stderr).toBe(0);
+    expect(restage.stdout).toContain("Bereits aktuell");
+    expect(git(fixture.work, "branch", "--show-current")).toBe("main");
   });
 
   it("rejects the removed rollback action without touching the launcher", () => {

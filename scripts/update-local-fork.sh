@@ -110,6 +110,14 @@ stage_update() {
     die "Upstream-Merge hat Konflikte; aktiver Launcher und main bleiben unverändert."
   fi
 
+  local merged_head stored_commit
+  merged_head=$(git rev-parse HEAD)
+  stored_commit=$(read_status_value commit 2>/dev/null || true)
+  if [[ -n "$stored_commit" && "$stored_commit" == "$merged_head" ]]; then
+    printf 'Bereits aktuell: %s\n' "$merged_head"
+    exit 0
+  fi
+
   corepack pnpm install --frozen-lockfile
   bash -lc "$CHECK_COMMAND"
   bash -lc "$TYPECHECK_COMMAND"
