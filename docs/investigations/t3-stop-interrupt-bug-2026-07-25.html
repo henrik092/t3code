@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>T3 Code – Untersuchung des fehlgeschlagenen Stopps</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f3f5f7;
+        --surface: #ffffff;
+        --surface-muted: #f7f8fa;
+        --ink: #17202a;
+        --muted: #5c6672;
+        --line: #dfe4e9;
+        --accent: #176b5b;
+        --accent-soft: #e3f2ed;
+        --danger: #a33a31;
+        --danger-soft: #fae9e7;
+        --warning: #8a5a12;
+        --warning-soft: #fff2d8;
+        --info: #315c89;
+        --info-soft: #e9f1fa;
+        --shadow: 0 16px 42px rgb(24 37 50 / 8%);
+        --radius: 18px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --page: #111518;
+          --surface: #181e22;
+          --surface-muted: #1e252a;
+          --ink: #edf1f4;
+          --muted: #aab3bb;
+          --line: #303a41;
+          --accent: #72cdb8;
+          --accent-soft: #183b34;
+          --danger: #ff988e;
+          --danger-soft: #472520;
+          --warning: #f1bf67;
+          --warning-soft: #493719;
+          --info: #93bde5;
+          --info-soft: #1f3449;
+          --shadow: 0 16px 42px rgb(0 0 0 / 22%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 88% 0%, rgb(23 107 91 / 9%), transparent 34rem), var(--page);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.62;
+      }
+
+      a {
+        color: var(--accent);
+        text-underline-offset: 0.18em;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        overflow-wrap: anywhere;
+      }
+
+      .page {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 80px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(28px, 6vw, 62px);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .hero::after {
+        position: absolute;
+        inset: auto -8rem -10rem auto;
+        width: 24rem;
+        height: 24rem;
+        border-radius: 50%;
+        background: rgb(23 107 91 / 10%);
+        content: "";
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 750;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin-top: 0;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+      }
+
+      h1 {
+        max-width: 850px;
+        margin-bottom: 18px;
+        font-size: clamp(2.1rem, 5.5vw, 4.5rem);
+      }
+
+      h2 {
+        margin-bottom: 20px;
+        font-size: clamp(1.45rem, 3vw, 2rem);
+      }
+
+      h3 {
+        margin-bottom: 10px;
+        font-size: 1.05rem;
+      }
+
+      p {
+        margin: 0 0 16px;
+      }
+
+      .lede {
+        position: relative;
+        z-index: 1;
+        max-width: 800px;
+        margin-bottom: 28px;
+        color: var(--muted);
+        font-size: clamp(1rem, 2.2vw, 1.22rem);
+      }
+
+      .meta {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 650;
+      }
+
+      .pill.confirmed {
+        border-color: transparent;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .section {
+        margin-top: 24px;
+        padding: clamp(24px, 4vw, 40px);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .section-intro {
+        max-width: 850px;
+        color: var(--muted);
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .metric {
+        min-height: 126px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface-muted);
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--accent);
+        font-size: 1.85rem;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .callout {
+        margin-top: 20px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent);
+        border-radius: 0 12px 12px 0;
+        background: var(--accent-soft);
+      }
+
+      .callout.danger {
+        border-left-color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      .callout.warning {
+        border-left-color: var(--warning);
+        background: var(--warning-soft);
+      }
+
+      .callout.info {
+        border-left-color: var(--info);
+        background: var(--info-soft);
+      }
+
+      .fault-chain {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 28px;
+        margin-top: 28px;
+        counter-reset: chain;
+      }
+
+      .fault-step {
+        position: relative;
+        min-height: 190px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface-muted);
+        counter-increment: chain;
+      }
+
+      .fault-step::before {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        margin-bottom: 16px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--ink);
+        color: var(--surface);
+        content: counter(chain);
+        font-size: 0.85rem;
+        font-weight: 750;
+      }
+
+      .fault-step:not(:last-child)::after {
+        position: absolute;
+        top: 50%;
+        right: -22px;
+        color: var(--muted);
+        content: "→";
+        font-size: 1.4rem;
+      }
+
+      .fault-step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.91rem;
+      }
+
+      .timeline {
+        position: relative;
+        margin: 30px 0 0 8px;
+        padding-left: 28px;
+        border-left: 2px solid var(--line);
+      }
+
+      .timeline-item {
+        position: relative;
+        padding: 0 0 26px;
+      }
+
+      .timeline-item:last-child {
+        padding-bottom: 0;
+      }
+
+      .timeline-item::before {
+        position: absolute;
+        top: 4px;
+        left: -36px;
+        width: 14px;
+        height: 14px;
+        border: 3px solid var(--surface);
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 1px var(--line);
+        content: "";
+      }
+
+      .timeline time {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--accent);
+        font-size: 0.84rem;
+        font-weight: 750;
+      }
+
+      .timeline p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .evidence-table {
+        width: 100%;
+        margin-top: 24px;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+      }
+
+      .evidence-table th,
+      .evidence-table td {
+        padding: 14px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .evidence-table th {
+        color: var(--muted);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .evidence-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .status {
+        display: inline-flex;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .status.failed {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .code-block {
+        overflow-x: auto;
+        margin: 18px 0 0;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-muted);
+        color: var(--ink);
+        font-size: 0.86rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface-muted);
+      }
+
+      .card p:last-child,
+      .card ul:last-child,
+      .card ol:last-child {
+        margin-bottom: 0;
+      }
+
+      ul,
+      ol {
+        margin: 12px 0 18px;
+        padding-left: 1.35rem;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .source-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 20px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .source-list li {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-muted);
+      }
+
+      .source-list strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      footer {
+        padding: 28px 8px 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+
+      @media (max-width: 880px) {
+        .metrics,
+        .fault-chain {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fault-step:nth-child(2)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 20px, 1120px);
+          padding-top: 16px;
+        }
+
+        .hero,
+        .section {
+          border-radius: 16px;
+        }
+
+        .metrics,
+        .fault-chain,
+        .two-column {
+          grid-template-columns: 1fr;
+        }
+
+        .fault-step::after {
+          display: none;
+        }
+
+        .evidence-table,
+        .evidence-table tbody,
+        .evidence-table tr,
+        .evidence-table td {
+          display: block;
+          width: 100%;
+        }
+
+        .evidence-table thead {
+          display: none;
+        }
+
+        .evidence-table tr {
+          padding: 12px 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .evidence-table td {
+          padding: 5px 0;
+          border: 0;
+        }
+
+        .evidence-table td::before {
+          display: block;
+          color: var(--muted);
+          content: attr(data-label);
+          font-size: 0.7rem;
+          font-weight: 750;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          width: 100%;
+          padding: 0;
+        }
+
+        .hero,
+        .section {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+
+        a {
+          color: inherit;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Technischer Untersuchungsbericht</p>
+        <h1>T3 Code konnte einen laufenden Turn nicht stoppen</h1>
+        <p class="lede">
+          Untersuchung des Vorfalls vom 25. Juli 2026: Ein laufender Turn nutzte Browser Use im
+          angemeldeten Google Chrome. Mehrere Klicks auf „Stop generation“ wurden von T3 Code
+          angenommen, erreichten Codex aber mit der falschen Turn-ID.
+        </p>
+        <div class="meta" aria-label="Berichtsmetadaten">
+          <span class="pill confirmed">Status: Fehler bestätigt</span>
+          <span class="pill">Datum: 25. Juli 2026</span>
+          <span class="pill">Zeitzone: Europe/Berlin</span>
+          <span class="pill">Bereich: Codex · Steer · Interrupt</span>
+        </div>
+      </header>
+
+      <section class="section" aria-labelledby="summary">
+        <p class="eyebrow">Kurzfassung</p>
+        <h2 id="summary">Das Stoppen scheiterte an einer falschen internen Turn-ID</h2>
+        <p class="section-intro">
+          Der Klick selbst funktionierte. T3 Code nahm jeden Stop-Befehl an und erzeugte jeweils ein
+          <code>thread.turn-interrupt-requested</code>-Ereignis. Nach einer während des laufenden
+          Turns gesendeten Nachsteuerung hatte die lokale Steer-Implementierung jedoch eine andere
+          Turn-ID als aktiv gespeichert, obwohl beim Provider weiterhin der ursprüngliche Turn lief.
+          Der Interrupt zielte dadurch auf den falschen Turn und wurde abgelehnt.
+        </p>
+
+        <div class="metrics" aria-label="Wichtigste Feststellungen">
+          <article class="metric">
+            <strong>16</strong>
+            <span>eindeutige Stop-Befehle innerhalb von rund 17 Sekunden</span>
+          </article>
+          <article class="metric">
+            <strong>16</strong>
+            <span>vom T3-Orchestrator angenommene Commands ohne Receipt-Fehler</span>
+          </article>
+          <article class="metric">
+            <strong>0</strong>
+            <span>erfolgreiche Provider-Interrupts in diesem Zeitraum</span>
+          </article>
+          <article class="metric">
+            <strong>1</strong>
+            <span>reproduzierbarer ID-Mismatch als gemeinsame Ursache</span>
+          </article>
+        </div>
+
+        <div class="callout danger">
+          <strong>Verdikt:</strong> Dies war kein Bedienfehler und kein verlorener Mausklick. Es ist
+          ein echter Zustands-/Kompatibilitätsfehler im T3-Code-Pfad für <code>turn/steer</code> und
+          <code>turn/interrupt</code>.
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="fault-chain">
+        <p class="eyebrow">Fehlerkette</p>
+        <h2 id="fault-chain">Wie der falsche Zustand entstand</h2>
+        <div class="fault-chain">
+          <article class="fault-step">
+            <h3>Turn läuft</h3>
+            <p>Der ursprüngliche Codex-Turn ist aktiv und führt Browser-/Tool-Aufrufe aus.</p>
+          </article>
+          <article class="fault-step">
+            <h3>Nachricht wird gesteert</h3>
+            <p>
+              „Guck dir das in meinem Google Chrome an.“ wird während des laufenden Turns per
+              <code>turn/steer</code> eingespeist.
+            </p>
+          </article>
+          <article class="fault-step">
+            <h3>ID wird überschrieben</h3>
+            <p>
+              T3 Code übernimmt die zurückgegebene ID als <code>activeTurnId</code>, obwohl der
+              Provider weiterhin den ursprünglichen Turn ausführt.
+            </p>
+          </article>
+          <article class="fault-step">
+            <h3>Stop trifft falschen Turn</h3>
+            <p>
+              Jeder Interrupt liest die überschreibende Session-ID und wird vom Codex App Server
+              wegen des Mismatches abgelehnt.
+            </p>
+          </article>
+        </div>
+
+        <pre
+          class="code-block"
+          aria-label="Turn-ID-Abweichung"
+        ><code>T3 Code sendete:   019f98f9-1ed3-7013-8c24-12d99dabdce7
+Codex führte aus:   019f98f7-f883-7ec0-a0ae-096102edd399
+
+Provider-Fehler:
+expected active turn id 019f98f9-1ed3-7013-8c24-12d99dabdce7
+but found 019f98f7-f883-7ec0-a0ae-096102edd399</code></pre>
+      </section>
+
+      <section class="section" aria-labelledby="timeline">
+        <p class="eyebrow">Zeitlinie</p>
+        <h2 id="timeline">Ablauf des beobachteten Vorfalls</h2>
+        <p class="section-intro">
+          Zeiten in lokaler Zeit (CEST, UTC+2). Die persistierten Datenbankzeiten wurden aus UTC
+          umgerechnet.
+        </p>
+
+        <div class="timeline">
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:10:17+02:00">13:10:17</time>
+            <h3>Turn gestartet</h3>
+            <p>
+              Auftrag, den Wechsel des ChatGPT-Plans zu prüfen. Später wurde ausdrücklich auf die
+              bereits angemeldete Google-Chrome-Sitzung gewechselt.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:11:30+02:00">13:11:30</time>
+            <h3>Nachsteuerung während eines laufenden Tools</h3>
+            <p>
+              Die Nachricht „Guck dir das in meinem Google Chrome an.“ wurde als weiterer
+              Turn-Start-Request erfasst und serverseitig in den laufenden Turn gesteert.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:12:20+02:00">13:12:20</time>
+            <h3>Vorheriger Preview-Aufruf endet im Timeout</h3>
+            <p>
+              Ein 60-sekündiger <code>preview_navigate</code>-Aufruf endete im Timeout. Danach
+              arbeitete der Turn über Browser Use in Chrome weiter.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:13:20+02:00">13:13:20</time>
+            <h3>Erster Stop-Befehl</h3>
+            <p>
+              Der erste von 16 eindeutigen Stop-Commands wurde als
+              <code>thread.turn-interrupt-requested</code> persistiert und angenommen.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:13:38+02:00">13:13:38</time>
+            <h3>Letzter Stop-Befehl</h3>
+            <p>
+              Auch der letzte Klick wurde angenommen. Die Provider-Aufrufe scheiterten weiterhin am
+              identischen Turn-ID-Mismatch.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:13:43+02:00">13:13:43</time>
+            <h3>Manuelle Textanweisung</h3>
+            <p>
+              „Ok, stopp die Arbeit.“ wurde als Nachricht eingespeist. Der Agent reagierte
+              kooperativ, beendete die Chrome-Steuerung und nahm keine Abo-Änderung vor.
+            </p>
+          </article>
+          <article class="timeline-item">
+            <time datetime="2026-07-25T13:13:58+02:00">13:13:58</time>
+            <h3>Turn regulär beendet</h3>
+            <p>
+              Der Turn endete durch die Reaktion des Agenten auf die Textanweisung, nicht durch
+              einen technisch erfolgreichen Interrupt.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="evidence">
+        <p class="eyebrow">Belege</p>
+        <h2 id="evidence">Was direkt nachgewiesen wurde</h2>
+
+        <table class="evidence-table">
+          <thead>
+            <tr>
+              <th>Beobachtung</th>
+              <th>Quelle</th>
+              <th>Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="Beobachtung">16 eindeutige Stop-Commands</td>
+              <td data-label="Quelle">
+                <code>orchestration_events</code> im live genutzten
+                <code>~/.t3/userdata/state.sqlite</code>
+              </td>
+              <td data-label="Ergebnis"><span class="status">Bestätigt</span></td>
+            </tr>
+            <tr>
+              <td data-label="Beobachtung">Alle Command-Receipts angenommen</td>
+              <td data-label="Quelle">
+                Join mit <code>orchestration_command_receipts</code>; Status <code>accepted</code>,
+                keine Receipt-Fehler
+              </td>
+              <td data-label="Ergebnis"><span class="status">Bestätigt</span></td>
+            </tr>
+            <tr>
+              <td data-label="Beobachtung">Provider-Interrupts fehlgeschlagen</td>
+              <td data-label="Quelle">
+                T3-Server-Trace zum Thread
+                <code>64190f5b-426e-4d0e-a7bc-09d5d8339479</code>
+              </td>
+              <td data-label="Ergebnis"><span class="status failed">16× Mismatch</span></td>
+            </tr>
+            <tr>
+              <td data-label="Beobachtung">Ursprünglicher Turn lief weiter</td>
+              <td data-label="Quelle">
+                Provider-Log: Tool-Events blieben dem Turn
+                <code>019f98f7-f883-7ec0-a0ae-096102edd399</code> zugeordnet
+              </td>
+              <td data-label="Ergebnis"><span class="status">Bestätigt</span></td>
+            </tr>
+            <tr>
+              <td data-label="Beobachtung">Kein Abo verändert</td>
+              <td data-label="Quelle">Turn-Verlauf und abschließende Browser-Finalisierung</td>
+              <td data-label="Ergebnis"><span class="status">Bestätigt</span></td>
+            </tr>
+            <tr>
+              <td data-label="Beobachtung">Mehr-Tab-UI-Reproduktion</td>
+              <td data-label="Quelle">
+                Isolierter Test wurde durch die separate Preview-Automation blockiert
+              </td>
+              <td data-label="Ergebnis"><span class="status failed">Nicht abgeschlossen</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout info">
+          <strong>Warum weitere Tabs die Ursache nicht ändern:</strong> Die Stop-Commands erreichten
+          bereits den gemeinsamen Server. Der falsche Wert lag im serverseitigen Session-Zustand.
+          Ein anderer Tab desselben Threads würde deshalb denselben fehlerhaften Zielwert verwenden.
+          Ein Mehr-Tab-Test bleibt sinnvoll als spätere Regression, ist aber für die Ursachenklärung
+          nicht mehr erforderlich.
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="code-path">
+        <p class="eyebrow">Codepfad</p>
+        <h2 id="code-path">Die problematischen Übergaben im Repository</h2>
+
+        <div class="two-column">
+          <article class="card">
+            <h3>1. Steer überschreibt die aktive ID</h3>
+            <p>
+              In <code>apps/server/src/provider/Layers/CodexSessionRuntime.ts:1309–1324</code> wird
+              bei einem laufenden Turn <code>turn/steer</code> aufgerufen. Anschließend setzt T3
+              Code <code>session.activeTurnId</code> ungeprüft auf <code>response.turnId</code>.
+            </p>
+            <p>
+              Diese Logik stammt aus dem lokalen Fork-Commit
+              <code>883b95ebae</code> („Feature: add queued and steered messages“).
+            </p>
+          </article>
+          <article class="card">
+            <h3>2. Interrupt liest den überschriebenen Wert</h3>
+            <p>
+              In derselben Datei, Zeilen <code>1362–1373</code>, nimmt
+              <code>interruptTurn</code> ohne explizite Provider-Turn-ID den Wert aus
+              <code>session.activeTurnId</code>. Dadurch wird genau die falsche ID versendet.
+            </p>
+          </article>
+          <article class="card">
+            <h3>3. Der Event-Payload wird nicht verwendet</h3>
+            <p>
+              <code>ProviderCommandReactor.ts:887–908</code> erhält zwar das
+              <code>thread.turn-interrupt-requested</code>-Ereignis, ruft den Provider aber
+              absichtlich nur per Thread/Session auf. Der Runtime-Zustand entscheidet somit allein
+              über das Ziel.
+            </p>
+          </article>
+          <article class="card">
+            <h3>4. Die Oberfläche sieht nur „angenommen“</h3>
+            <p>
+              <code>ChatView.tsx:4858–4871</code> zeigt nur einen Fehler, wenn bereits das
+              Dispatching des Commands scheitert. Hier war das Dispatching erfolgreich; der spätere
+              Provider-Fehler wurde lediglich im Server-Trace protokolliert. Deshalb wirkte der
+              Button ohne Rückmeldung.
+            </p>
+          </article>
+        </div>
+
+        <div class="callout warning">
+          <strong>Protokollerwartung:</strong> Laut offizieller Codex-App-Server-Dokumentation fügt
+          <code>turn/steer</code> Eingabe in den aktiven Turn ein und gibt dessen aktive
+          <code>turnId</code> zurück. <code>turn/interrupt</code> soll den laufenden Turn beenden
+          und anschließend ein <code>turn/completed</code> mit Status
+          <code>interrupted</code> auslösen. Der beobachtete abweichende Rückgabewert muss deshalb
+          validiert oder robust abgefangen werden.
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="not-cause">
+        <p class="eyebrow">Abgrenzung</p>
+        <h2 id="not-cause">Was nicht die Ursache war</h2>
+        <div class="two-column">
+          <article class="card">
+            <h3>Nicht Google Chrome</h3>
+            <p>
+              Chrome und Browser Use waren der Arbeitskontext. Der eigentliche Fehler trat erst bei
+              der Auswahl der Turn-ID im T3-Server auf.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Nicht der einzelne Klick</h3>
+            <p>
+              16 verschiedene Commands belegen, dass Interaktion und WebSocket-Übertragung
+              funktionierten.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Nicht primär tab-spezifisch</h3>
+            <p>
+              Der fehlerhafte Zustand lag in der gemeinsamen Provider-Session. Ein anderer UI-Tab
+              hätte ihn wiederverwendet.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Keine Abo-Änderung</h3>
+            <p>
+              Die Untersuchung und der ursprüngliche Turn führten keine Änderung am
+              ChatGPT-Abonnement aus.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="workaround">
+        <p class="eyebrow">Bis zur Reparatur</p>
+        <h2 id="workaround">Praktischer Workaround</h2>
+        <ol>
+          <li>
+            Während eines laufenden Turns möglichst <strong>„Queue“</strong> statt
+            <strong>„Send now (steer)“</strong> verwenden, wenn später zuverlässig gestoppt werden
+            können muss.
+          </li>
+          <li>
+            Wenn der Stop-Button nicht reagiert, eine klare Textanweisung wie
+            <em>„Stoppe die Arbeit jetzt und führe keine weiteren Aktionen aus“</em> senden.
+          </li>
+          <li>
+            Dabei beachten: Eine Textanweisung ist kooperativ und kein technischer Interrupt. Ein
+            bereits laufender Tool-Aufruf kann zuerst noch zu Ende laufen.
+          </li>
+          <li>
+            Ein Reload oder Wechsel in einen anderen Tab repariert den bereits falschen
+            serverseitigen Session-Zustand voraussichtlich nicht.
+          </li>
+        </ol>
+      </section>
+
+      <section class="section" aria-labelledby="fix">
+        <p class="eyebrow">Empfohlene Reparatur</p>
+        <h2 id="fix">Robustheit an drei Stellen erhöhen</h2>
+
+        <ol>
+          <li>
+            <strong>Steer-Antwort validieren:</strong> Wenn <code>response.turnId</code> von der
+            bekannten aktiven ID abweicht, darf T3 Code den laufenden Session-Zustand nicht blind
+            überschreiben. Die aktive ID sollte beibehalten oder über <code>thread/read</code>
+            bestätigt werden.
+          </li>
+          <li>
+            <strong>Interrupt einmal sicher neu zielen:</strong> Meldet der Provider
+            <code>expected active turn id … but found …</code>, kann T3 Code die tatsächlich aktive
+            ID übernehmen und den Interrupt genau einmal wiederholen.
+          </li>
+          <li>
+            <strong>Fehler sichtbar machen:</strong> Scheitert die asynchrone Provider-Reaktion,
+            sollte ein <code>provider.turn.interrupt.failed</code>-Aktivitätseintrag und eine
+            verständliche Meldung im Thread erscheinen.
+          </li>
+        </ol>
+
+        <div class="callout">
+          <strong>Wichtig:</strong> Der Fix sollte nicht nur Browser Use behandeln. Die Ursache
+          liegt im allgemeinen Steer-/Interrupt-Zustand und kann grundsätzlich bei jedem langen Turn
+          mit einer mid-turn Nachsteuerung auftreten.
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="verification">
+        <p class="eyebrow">Abnahmekriterien</p>
+        <h2 id="verification">So sollte die Reparatur verifiziert werden</h2>
+        <ol>
+          <li>
+            Fokussierter Runtime-Test: Ein laufender Turn erhält eine Steer-Antwort mit abweichender
+            ID; die tatsächlich aktive ID bleibt interruptierbar.
+          </li>
+          <li>
+            Fokussierter Provider-Test: Ein ID-Mismatch beim ersten Interrupt führt zu genau einem
+            sicheren Retry mit der gemeldeten aktiven ID.
+          </li>
+          <li>
+            Fehlerpfad-Test: Ein endgültig fehlgeschlagener Interrupt erzeugt eine sichtbare
+            Thread-Aktivität statt nur eines Server-Logs.
+          </li>
+          <li>
+            Integrierter Web-Test: Langen, harmlosen Tool-Aufruf starten, Nachricht per
+            <strong>Send now (steer)</strong> einspeisen, Stop drücken und
+            <code>turn/completed: interrupted</code> nachweisen.
+          </li>
+          <li>Zweiter Tab: denselben aktiven Thread öffnen und den Stop von dort wiederholen.</li>
+          <li>
+            Browser-Use-Variante: Den Ablauf mit einem harmlosen Chrome-Ziel wiederholen, ohne
+            Konto-, Kauf- oder Abo-Aktionen.
+          </li>
+        </ol>
+      </section>
+
+      <section class="section" aria-labelledby="limits">
+        <p class="eyebrow">Testgrenzen</p>
+        <h2 id="limits">Was noch nicht live verifiziert wurde</h2>
+        <p>
+          Eine isolierte Mehr-Tab-Reproduktion wurde begonnen, konnte aber nicht sauber
+          abgeschlossen werden, weil die separate T3-Preview-Automation selbst mehrfach in
+          <code>PreviewAutomationTimeoutError</code> lief. Die dafür gestarteten Testserver wurden
+          anschließend beendet und die ausschließlich dafür angelegten temporären Zustände entfernt.
+        </p>
+        <p>
+          Diese Einschränkung betrifft die zusätzliche UI-Reproduktion, nicht die Ursachenanalyse:
+          Persistierte Commands, Provider-Trace, Turn-Zuordnung und Quellcodepfad belegen den
+          ID-Mismatch bereits unabhängig davon.
+        </p>
+        <div class="callout info">
+          <strong>Repositoryzustand zum Abschluss der Untersuchung:</strong> sauberer Arbeitsbaum;
+          es wurden bis zu diesem Bericht keine Änderungen am Anwendungscode vorgenommen.
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="sources">
+        <p class="eyebrow">Quellen und Artefakte</p>
+        <h2 id="sources">Nachvollziehbarkeit</h2>
+        <ul class="source-list">
+          <li>
+            <strong>Live-Zustandsdatenbank</strong>
+            <code>/home/rik/.t3/userdata/state.sqlite</code> – Orchestrierungsereignisse,
+            Command-Receipts und Thread-/Session-Projektionen.
+          </li>
+          <li>
+            <strong>Provider-Protokoll</strong>
+            <code
+              >/home/rik/.t3/userdata/logs/provider/64190f5b-426e-4d0e-a7bc-09d5d8339479.log</code
+            >
+            – Tool- und Turn-Zuordnung des ursprünglichen Codex-Turns.
+          </li>
+          <li>
+            <strong>Lokaler Quellcode</strong>
+            <code>apps/server/src/provider/Layers/CodexSessionRuntime.ts</code>,
+            <code>apps/server/src/orchestration/Layers/ProviderCommandReactor.ts</code> und
+            <code>apps/web/src/components/ChatView.tsx</code>.
+          </li>
+          <li>
+            <strong>Einführender Fork-Commit</strong>
+            <code>883b95ebae509e105953ce2ed3152ad584b93992</code> – „Feature: add queued and steered
+            messages“.
+          </li>
+          <li>
+            <strong>Offizielles Protokoll</strong>
+            <a href="https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md"
+              >OpenAI Codex App Server README</a
+            >
+            – dokumentierte Semantik von <code>turn/steer</code> und <code>turn/interrupt</code>.
+          </li>
+        </ul>
+      </section>
+
+      <footer>Erstellt am 25. Juli 2026 · Lokaler Untersuchungsbericht für den T3-Code-Fork</footer>
+    </main>
+  </body>
+</html>
