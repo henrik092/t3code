@@ -78,6 +78,11 @@ function makeFixture(options?: { readonly conflict?: boolean }) {
     writeCommit(upstreamWork, "upstream.txt", "new upstream\n", "upstream change");
   }
   git(upstreamWork, "push", "origin", "main");
+  git(upstreamWork, "tag", "v0.0.1");
+  git(upstreamWork, "push", "origin", "v0.0.1");
+
+  writeCommit(work, "local-patch.txt", "monitor presets\n", "local stable patch");
+  const stablePatchCommit = git(work, "rev-parse", "HEAD");
 
   const oldBuild = NodePath.join(install, "old.AppImage");
   NodeFS.writeFileSync(oldBuild, "old");
@@ -95,6 +100,8 @@ function makeFixture(options?: { readonly conflict?: boolean }) {
     T3CODE_UPDATE_TYPECHECK_COMMAND: "true",
     T3CODE_UPDATE_TEST_COMMAND: "true",
     T3CODE_UPDATE_BUILD_COMMAND: 'touch "$T3CODE_DESKTOP_OUTPUT_DIR/T3-Code-test-x86_64.AppImage"',
+    T3CODE_UPDATE_VERSION_COMMAND: "true",
+    T3CODE_STABLE_PATCH_COMMIT: stablePatchCommit,
   };
   return { work, install, launcher, oldBuild, env };
 }
@@ -153,6 +160,41 @@ describe("local T3 Code fork updater", () => {
 
     expect(runUpdate(fixture, "activate").status).toBe(0);
     expect(NodeFS.realpathSync(fixture.launcher)).toBe(candidate);
+  });
+
+  it("builds the latest stable tag with the configured local patch", () => {
+    const fixture = makeFixture();
+    const before = git(fixture.work, "rev-parse", "main");
+
+    const stage = runUpdate(fixture, "stable-stage");
+
+    expect(stage.status, stage.stderr).toBe(0);
+    expect(stage.stdout).toContain("Geprüfter Stable-Build bereit");
+    expect(git(fixture.work, "rev-parse", "main")).toBe(before);
+    expect(NodeFS.realpathSync(fixture.launcher)).toBe(fixture.oldBuild);
+
+    const status = NodeFS.readFileSync(
+      NodePath.join(fixture.install, ".t3code-local-update-status"),
+      "utf8",
+    );
+    expect(status).toContain("release_tag\tv0.0.1");
+    expect(status).toContain(`patch_commit\t${fixture.env.T3CODE_STABLE_PATCH_COMMIT}`);
+    expect(runUpdate(fixture, "activate").status).toBe(0);
+    expect(NodeFS.realpathSync(fixture.launcher)).toContain("T3-Code-stable-local-0.0.1-");
+  });
+
+  it("skips rebuilding an unchanged stable release and patch", () => {
+    const fixture = makeFixture();
+    expect(runUpdate(fixture, "stable-stage").status).toBe(0);
+
+    const restage = runUpdate(fixture, "stable-stage", {
+      ...fixture.env,
+      T3CODE_UPDATE_BUILD_COMMAND:
+        'printf changed > "$T3CODE_DESKTOP_OUTPUT_DIR/T3-Code-test-x86_64.AppImage"',
+    });
+
+    expect(restage.status, restage.stderr).toBe(0);
+    expect(restage.stdout).toContain("Stable bereits aktuell");
   });
 
   it("does not rebuild or touch the active build when the merged head is unchanged", () => {
