@@ -16,9 +16,31 @@ export interface PreviewViewportPreset {
 
 type PreviewViewportPresetDefinition = Omit<PreviewViewportPreset, "id">;
 
-// Keep this in Chrome DevTools' default-device order. Dimensions are CSS
-// viewport sizes from Chromium's EmulatedDevices.ts standard catalog.
+// Desktop monitor presets come first for quick responsive checks. Keep the
+// remaining devices in Chrome DevTools' default-device order. Device dimensions
+// are CSS viewport sizes from Chromium's EmulatedDevices.ts standard catalog.
 const PREVIEW_VIEWPORT_PRESET_DEFINITIONS = {
+  "desktop-1920x1080": {
+    label: "1080p (Full HD)",
+    category: "Desktop",
+    detail: "1920 × 1080",
+    width: 1920,
+    height: 1080,
+  },
+  "desktop-2560x1440": {
+    label: "1440p (QHD)",
+    category: "Desktop",
+    detail: "2560 × 1440",
+    width: 2560,
+    height: 1440,
+  },
+  "desktop-3840x2160": {
+    label: "4K (UHD)",
+    category: "Desktop",
+    detail: "3840 × 2160",
+    width: 3840,
+    height: 2160,
+  },
   "iphone-se": {
     label: "iPhone SE",
     category: "Phone",

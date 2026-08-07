@@ -52,6 +52,9 @@ export const PreviewRenderedViewportSize = Schema.Struct({
 export type PreviewRenderedViewportSize = typeof PreviewRenderedViewportSize.Type;
 
 export const PREVIEW_VIEWPORT_PRESET_IDS = [
+  "desktop-1920x1080",
+  "desktop-2560x1440",
+  "desktop-3840x2160",
   "iphone-se",
   "iphone-xr",
   "iphone-12-pro",
@@ -80,7 +83,6 @@ export type PreviewViewportPresetId = typeof PreviewViewportPresetId.Type;
  * PREVIEW_VIEWPORT_PRESET_IDS.
  */
 const LEGACY_PREVIEW_VIEWPORT_PRESET_IDS = [
-  "desktop-1920x1080",
   "desktop-1440x900",
   "laptop-1366x768",
   "laptop-1280x800",

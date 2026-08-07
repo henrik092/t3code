@@ -38,8 +38,11 @@ describe("previewViewport", () => {
     });
   });
 
-  it("matches Chrome's standard device catalog ordering", () => {
+  it("lists monitor presets before Chrome's standard device catalog", () => {
     expect(PREVIEW_VIEWPORT_PRESETS.map((preset) => preset.label)).toEqual([
+      "1080p (Full HD)",
+      "1440p (QHD)",
+      "4K (UHD)",
       "iPhone SE",
       "iPhone XR",
       "iPhone 12 Pro",
@@ -58,6 +61,27 @@ describe("previewViewport", () => {
       "Nest Hub",
       "Nest Hub Max",
     ]);
+  });
+
+  it("resolves desktop monitor presets at their exact CSS viewport sizes", () => {
+    expect(resolvePreviewViewport({ mode: "preset", preset: "desktop-1920x1080" })).toEqual({
+      _tag: "preset",
+      width: 1920,
+      height: 1080,
+      presetId: "desktop-1920x1080",
+    });
+    expect(resolvePreviewViewport({ mode: "preset", preset: "desktop-2560x1440" })).toEqual({
+      _tag: "preset",
+      width: 2560,
+      height: 1440,
+      presetId: "desktop-2560x1440",
+    });
+    expect(resolvePreviewViewport({ mode: "preset", preset: "desktop-3840x2160" })).toEqual({
+      _tag: "preset",
+      width: 3840,
+      height: 2160,
+      presetId: "desktop-3840x2160",
+    });
   });
 
   it("formats settings for compact UI", () => {

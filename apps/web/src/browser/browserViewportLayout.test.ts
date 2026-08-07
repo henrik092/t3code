@@ -54,6 +54,26 @@ describe("resolveBrowserViewportLayout", () => {
     expect(layout.viewportScale).toBeCloseTo(5 / 12);
   });
 
+  it("fits a 4K monitor viewport while preserving its 16:9 presentation", () => {
+    expect(
+      resolveBrowserViewportLayout(
+        { width: 960, height: 700 },
+        {
+          _tag: "preset",
+          presetId: "desktop-3840x2160",
+          width: 3840,
+          height: 2160,
+        },
+      ),
+    ).toMatchObject({
+      viewportX: 0,
+      viewportY: 80,
+      viewportWidth: 960,
+      viewportHeight: 540,
+      viewportScale: 0.25,
+    });
+  });
+
   it("keeps fixed dimensions in page CSS pixels when browser zoom changes", () => {
     expect(
       resolveBrowserViewportLayout(

@@ -31,6 +31,12 @@ const SELECT_ITEMS = [
   { value: RESPONSIVE_VALUE, label: "Responsive" },
   ...PREVIEW_VIEWPORT_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
 ];
+const MONITOR_VIEWPORT_PRESETS = PREVIEW_VIEWPORT_PRESETS.filter(
+  (preset) => preset.category === "Desktop",
+);
+const DEVICE_VIEWPORT_PRESETS = PREVIEW_VIEWPORT_PRESETS.filter(
+  (preset) => preset.category !== "Desktop",
+);
 
 function ScreenRotationIcon() {
   return (
@@ -218,8 +224,21 @@ export function BrowserDeviceToolbar({
         <SelectPopup align="start" alignItemWithTrigger={false} className="min-w-64">
           <SelectItem value={RESPONSIVE_VALUE}>Responsive</SelectItem>
           <SelectGroup>
-            <SelectGroupLabel>Standard</SelectGroupLabel>
-            {PREVIEW_VIEWPORT_PRESETS.map((preset) => (
+            <SelectGroupLabel>Monitors</SelectGroupLabel>
+            {MONITOR_VIEWPORT_PRESETS.map((preset) => (
+              <SelectItem key={preset.id} value={preset.id}>
+                <span className="flex w-full items-center justify-between gap-5">
+                  <span>{preset.label}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {preset.detail}
+                  </span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+          <SelectGroup>
+            <SelectGroupLabel>Devices</SelectGroupLabel>
+            {DEVICE_VIEWPORT_PRESETS.map((preset) => (
               <SelectItem key={preset.id} value={preset.id}>
                 <span className="flex w-full items-center justify-between gap-5">
                   <span>{preset.label}</span>
