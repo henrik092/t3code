@@ -266,18 +266,6 @@ describe("buildTurnSteerInput", () => {
 });
 
 describe("buildCodexDeveloperInstructions", () => {
-  it("allows structured user questions while continuing work in default mode", () => {
-    const instructions = buildCodexDeveloperInstructions("default", {
-      model: "gpt-5.6-sol",
-      reasoningEffort: "high",
-    });
-
-    NodeAssert.match(instructions, /request_user_input.*listed in the available tools/);
-    NodeAssert.match(instructions, /selectable option or a custom response/);
-    NodeAssert.match(instructions, /continue the requested work/);
-    NodeAssert.doesNotMatch(instructions, /request_user_input.*unavailable in Default mode/);
-  });
-
   it("appends runtime info after the mode instructions", () => {
     const instructions = buildCodexDeveloperInstructions("default", {
       model: "gpt-5.3-codex",
@@ -353,8 +341,6 @@ describe("codexSessionAppServerArgs", () => {
   it("keeps the app-server subcommand when explicit args are provided", () => {
     NodeAssert.deepStrictEqual(codexSessionAppServerArgs(["-c", "model=gpt-5"], undefined), [
       "app-server",
-      "--enable",
-      "default_mode_request_user_input",
       "-c",
       "model=gpt-5",
     ]);
@@ -368,8 +354,6 @@ describe("codexSessionAppServerArgs", () => {
       ),
       [
         "app-server",
-        "--enable",
-        "default_mode_request_user_input",
         "--strict-config",
         "--enable",
         "foo",

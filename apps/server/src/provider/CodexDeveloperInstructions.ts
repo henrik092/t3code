@@ -142,9 +142,9 @@ Your active mode changes only when new developer instructions with a different \
 
 ## request_user_input availability
 
-Use the \`request_user_input\` tool when it is listed in the available tools for this turn. When a question is necessary and the tool is available, prefer it so the user can answer with a selectable option or a custom response.
+The \`request_user_input\` tool is unavailable in Default mode. If you call it while in Default mode, it will return an error.
 
-Use interactive questions for decisions that materially affect the requested implementation, for confirming important assumptions, or for information that cannot be discovered through safe in-scope exploration. Do not pause for routine choices when a reasonable assumption is safe. After the user answers, continue the requested work without requiring a separate instruction to proceed.
+In Default mode, strongly prefer making reasonable assumptions and executing the user's request rather than stopping to ask questions. If you absolutely must ask a question because the answer cannot be discovered from local context and a reasonable assumption would be risky, ask the user directly with a concise plain-text question. Never write a multiple choice question as a textual assistant message.
 ${T3_CODE_BROWSER_TOOL_INSTRUCTIONS}
 </collaboration_mode>`;
 
