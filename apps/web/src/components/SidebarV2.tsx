@@ -1156,6 +1156,24 @@ export default function SidebarV2() {
     [projectGroupingSettings.sidebarProjectGroupingOverrides, updateSettings],
   );
 
+  const updateProjectGroupAlias = useCallback(
+    (member: SidebarProjectGroupMember, nextAlias: string) => {
+      const overrideKey = deriveProjectGroupingOverrideKey(member);
+      const alias = nextAlias.trim();
+      const currentAlias = projectGroupingSettings.sidebarProjectGroupAliases?.[overrideKey] ?? "";
+      if (alias === currentAlias) return;
+
+      const nextAliases = { ...projectGroupingSettings.sidebarProjectGroupAliases };
+      if (alias.length === 0) {
+        delete nextAliases[overrideKey];
+      } else {
+        nextAliases[overrideKey] = alias;
+      }
+      updateSettings({ sidebarProjectGroupAliases: nextAliases });
+    },
+    [projectGroupingSettings.sidebarProjectGroupAliases, updateSettings],
+  );
+
   const handleProjectActions = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>, projectGroup: SidebarProjectSnapshot) => {
       event.preventDefault();
@@ -2130,6 +2148,29 @@ export default function SidebarV2() {
                           </SelectItem>
                         </SelectPopup>
                       </Select>
+                    </label>
+                    <label className="grid min-w-0 gap-1.5 sm:col-span-2">
+                      <span className="font-medium text-foreground">Shared project ID</span>
+                      <Input
+                        key={`${member.physicalProjectKey}:${projectGroupingSettings.sidebarProjectGroupAliases?.[member.physicalProjectKey] ?? ""}`}
+                        size="sm"
+                        aria-label={`Shared project ID in ${member.environmentLabel ?? "current environment"}`}
+                        defaultValue={
+                          projectGroupingSettings.sidebarProjectGroupAliases?.[
+                            member.physicalProjectKey
+                          ] ?? ""
+                        }
+                        placeholder="Optional, for example prox-controll"
+                        onBlur={(event) => {
+                          updateProjectGroupAlias(member, event.currentTarget.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") event.currentTarget.blur();
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        Use the same ID for copies of this project on other environments.
+                      </span>
                     </label>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:pl-7">

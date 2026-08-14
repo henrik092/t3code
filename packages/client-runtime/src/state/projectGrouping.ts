@@ -8,6 +8,7 @@ import { normalizeProjectPathForComparison } from "./projects.ts";
 export interface ProjectGroupingSettings {
   readonly sidebarProjectGroupingMode: SidebarProjectGroupingMode;
   readonly sidebarProjectGroupingOverrides: Record<string, SidebarProjectGroupingMode>;
+  readonly sidebarProjectGroupAliases?: Record<string, string>;
 }
 
 export type ProjectGroupingMode = SidebarProjectGroupingMode;
@@ -16,6 +17,7 @@ export function selectProjectGroupingSettings(settings: ClientSettings): Project
   return {
     sidebarProjectGroupingMode: settings.sidebarProjectGroupingMode,
     sidebarProjectGroupingOverrides: settings.sidebarProjectGroupingOverrides,
+    sidebarProjectGroupAliases: settings.sidebarProjectGroupAliases,
   };
 }
 
@@ -143,8 +145,17 @@ export function deriveLogicalProjectKeyFromSettings(
   >,
   settings: ProjectGroupingSettings,
 ): string {
+  const groupingMode = resolveProjectGroupingMode(project, settings);
+  if (groupingMode !== "separate") {
+    const alias =
+      settings.sidebarProjectGroupAliases?.[deriveProjectGroupingOverrideKey(project)]?.trim();
+    if (alias) {
+      return `manual:${alias.toLowerCase()}`;
+    }
+  }
+
   return deriveLogicalProjectKey(project, {
-    groupingMode: resolveProjectGroupingMode(project, settings),
+    groupingMode,
   });
 }
 

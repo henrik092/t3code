@@ -110,6 +110,22 @@ describe("ClientSettings sidebar v2", () => {
   });
 });
 
+describe("ClientSettings project grouping aliases", () => {
+  it("defaults to no manual project groups", () => {
+    expect(decodeClientSettings({}).sidebarProjectGroupAliases).toEqual({});
+  });
+
+  it("trims physical project keys and shared aliases", () => {
+    expect(
+      decodeClientSettings({
+        sidebarProjectGroupAliases: {
+          " env:/workspace ": " prox-controll ",
+        },
+      }).sidebarProjectGroupAliases,
+    ).toEqual({ "env:/workspace": "prox-controll" });
+  });
+});
+
 describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
   it("defaults to an empty record so legacy configs without the key still decode", () => {
     expect(DEFAULT_SERVER_SETTINGS.providerInstances).toEqual({});
