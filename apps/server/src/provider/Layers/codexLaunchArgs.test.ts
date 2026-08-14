@@ -6,6 +6,7 @@ import {
   codexAppServerArgs,
   codexExecLaunchArgs,
   resolveCodexLaunchArgs,
+  T3_CODEX_DEFAULT_APP_SERVER_ARGS,
 } from "./codexLaunchArgs.ts";
 
 describe("resolveCodexLaunchArgs", () => {
@@ -29,16 +30,29 @@ describe("resolveCodexLaunchArgs", () => {
 });
 
 describe("codexAppServerArgs", () => {
-  it("returns the app-server command for empty launch args", () => {
-    NodeAssert.deepStrictEqual(codexAppServerArgs(""), ["app-server"]);
+  it("enables interactive questions in default mode without machine-local config", () => {
+    NodeAssert.deepStrictEqual(codexAppServerArgs(""), [
+      "app-server",
+      ...T3_CODEX_DEFAULT_APP_SERVER_ARGS,
+    ]);
   });
 
-  it("appends parsed launch args after app-server", () => {
+  it("appends parsed launch args after portable T3 defaults", () => {
     NodeAssert.deepStrictEqual(codexAppServerArgs("--strict-config --enable foo"), [
       "app-server",
+      ...T3_CODEX_DEFAULT_APP_SERVER_ARGS,
       "--strict-config",
       "--enable",
       "foo",
+    ]);
+  });
+
+  it("keeps an explicit user override after the portable default", () => {
+    NodeAssert.deepStrictEqual(codexAppServerArgs("--disable default_mode_request_user_input"), [
+      "app-server",
+      ...T3_CODEX_DEFAULT_APP_SERVER_ARGS,
+      "--disable",
+      "default_mode_request_user_input",
     ]);
   });
 });
