@@ -410,9 +410,7 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Visible threads"]
         : []),
       ...(settings.sidebarProjectGroupingMode !==
-        DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ||
-      Object.keys(settings.sidebarProjectGroupingOverrides).length > 0 ||
-      Object.keys(settings.sidebarProjectGroupAliases).length > 0
+      DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
         ? ["Project Grouping"]
         : []),
       ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? ["Word wrap"] : []),
@@ -464,9 +462,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.automaticGitFetchInterval,
       settings.enableAssistantStreaming,
       settings.enableProviderUpdateChecks,
-      settings.sidebarProjectGroupAliases,
       settings.sidebarProjectGroupingMode,
-      settings.sidebarProjectGroupingOverrides,
       settings.sidebarThreadPreviewCount,
       settings.timestampFormat,
       settings.wordWrap,
@@ -492,8 +488,6 @@ export function useSettingsRestore(onRestored?: () => void) {
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
-      sidebarProjectGroupingOverrides: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingOverrides,
-      sidebarProjectGroupAliases: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupAliases,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
       enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -647,17 +641,12 @@ export function GeneralSettingsPanel() {
           description="Combine matching repositories across environments."
           resetAction={
             settings.sidebarProjectGroupingMode !==
-              DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ||
-            Object.keys(settings.sidebarProjectGroupingOverrides).length > 0 ||
-            Object.keys(settings.sidebarProjectGroupAliases).length > 0 ? (
+            DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
               <SettingResetButton
                 label="project grouping"
                 onClick={() =>
                   updateSettings({
                     sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
-                    sidebarProjectGroupingOverrides:
-                      DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingOverrides,
-                    sidebarProjectGroupAliases: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupAliases,
                   })
                 }
               />

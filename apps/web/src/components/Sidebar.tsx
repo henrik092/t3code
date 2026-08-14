@@ -1210,7 +1210,6 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   const [projectGroupingSelection, setProjectGroupingSelection] = useState<
     SidebarProjectGroupingMode | "inherit"
   >("inherit");
-  const [projectGroupAlias, setProjectGroupAlias] = useState("");
   const renamingCommittedRef = useRef(false);
   const renamingInputRef = useRef<HTMLInputElement | null>(null);
   const confirmArchiveButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -1425,12 +1424,8 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       setProjectGroupingSelection(
         projectGroupingSettings.sidebarProjectGroupingOverrides?.[overrideKey] ?? "inherit",
       );
-      setProjectGroupAlias(projectGroupingSettings.sidebarProjectGroupAliases?.[overrideKey] ?? "");
     },
-    [
-      projectGroupingSettings.sidebarProjectGroupAliases,
-      projectGroupingSettings.sidebarProjectGroupingOverrides,
-    ],
+    [projectGroupingSettings.sidebarProjectGroupingOverrides],
   );
 
   const removeProject = useCallback(
@@ -2127,7 +2122,6 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   const closeProjectGroupingDialog = useCallback(() => {
     setProjectGroupingTarget(null);
     setProjectGroupingSelection("inherit");
-    setProjectGroupAlias("");
   }, []);
 
   const saveProjectGroupingPreference = useCallback(() => {
@@ -2144,25 +2138,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
     } else {
       nextOverrides[overrideKey] = projectGroupingSelection;
     }
-    const nextAliases = {
-      ...projectGroupingSettings.sidebarProjectGroupAliases,
-    };
-    const alias = projectGroupAlias.trim();
-    if (alias.length === 0) {
-      delete nextAliases[overrideKey];
-    } else {
-      nextAliases[overrideKey] = alias;
-    }
     updateSettings({
       sidebarProjectGroupingOverrides: nextOverrides,
-      sidebarProjectGroupAliases: nextAliases,
     });
     closeProjectGroupingDialog();
   }, [
     closeProjectGroupingDialog,
-    projectGroupAlias,
     projectGroupingSelection,
-    projectGroupingSettings.sidebarProjectGroupAliases,
     projectGroupingSettings.sidebarProjectGroupingOverrides,
     projectGroupingTarget,
     updateSettings,
@@ -2507,24 +2489,6 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
                 ? projectGroupingModeDescription(projectGroupingSettings.sidebarProjectGroupingMode)
                 : projectGroupingModeDescription(projectGroupingSelection)}
             </p>
-            <div className="grid gap-1.5">
-              <span className="text-xs font-medium text-foreground">Shared project ID</span>
-              <Input
-                aria-label="Shared project ID"
-                value={projectGroupAlias}
-                placeholder="Optional, for example prox-controll"
-                onChange={(event) => setProjectGroupAlias(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    saveProjectGroupingPreference();
-                  }
-                }}
-              />
-              <span className="text-xs text-muted-foreground">
-                Use the same ID for copies of this project on other environments.
-              </span>
-            </div>
           </DialogPanel>
           <DialogFooter>
             <Button variant="outline" onClick={closeProjectGroupingDialog}>

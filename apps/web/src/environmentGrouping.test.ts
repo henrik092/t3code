@@ -131,46 +131,6 @@ describe("environment grouping", () => {
     ).toBe(repositoryIdentity.canonicalKey);
   });
 
-  it("groups non-git project copies with the same manual project id", () => {
-    const primary = makeProject();
-    const remote = makeProject({
-      id: ProjectId.make("project-remote"),
-      environmentId: remoteEnvironmentId,
-      workspaceRoot: "/srv/shared-repo",
-    });
-    const settings = {
-      ...defaultGroupingSettings,
-      sidebarProjectGroupAliases: {
-        [derivePhysicalProjectKey(primary)]: " Shared Project ",
-        [derivePhysicalProjectKey(remote)]: "shared project",
-      },
-    };
-
-    const snapshots = buildSidebarProjectSnapshots({
-      projects: [primary, remote],
-      settings,
-      primaryEnvironmentId,
-      resolveEnvironmentLabel: () => null,
-    });
-
-    expect(snapshots).toHaveLength(1);
-    expect(snapshots[0]?.projectKey).toBe("manual:shared project");
-    expect(snapshots[0]?.groupedProjectCount).toBe(2);
-  });
-
-  it("keeps a manually linked project separate when its grouping rule says so", () => {
-    const project = makeProject();
-    const physicalKey = derivePhysicalProjectKey(project);
-
-    expect(
-      deriveLogicalProjectKeyFromSettings(project, {
-        ...defaultGroupingSettings,
-        sidebarProjectGroupingOverrides: { [physicalKey]: "separate" },
-        sidebarProjectGroupAliases: { [physicalKey]: "shared project" },
-      }),
-    ).toBe(physicalKey);
-  });
-
   it("reports the effective grouping mode after applying an override", () => {
     const project = makeProject({ repositoryIdentity });
     const physicalKey = derivePhysicalProjectKey(project);
