@@ -56,7 +56,8 @@ fixes for the Proxmox T3 Code instance unless upstream has replaced them with eq
 ### ACP Registry provider (Kimi)
 
 The fork adds a generic multi-instance `acpRegistry` provider driver that launches locally installed
-ACP agents (upstream ACP support is still in flight, so this lives only in the fork):
+ACP agents (upstream ACP support is still in flight, so this lives only in the fork and is not
+available in the official nightly):
 
 - Server: `apps/server/src/provider/Drivers/AcpRegistryDriver.ts`,
   `apps/server/src/provider/Layers/GenericAcpAdapter.ts`, `apps/server/src/provider/acp/`
@@ -66,27 +67,29 @@ ACP agents (upstream ACP support is still in flight, so this lives only in the f
   `apps/web/src/components/settings/`; instance-only drivers must never assume a legacy
   `settings.providers` slot (see `deriveProviderSettingsInstanceRows` in `SettingsPanels.logic.ts`)
 
-Henrik's live instance is the Kimi CLI (`agentId: "kimi"`, `kimi acp`, auth method `login`) stored in
-`~/.t3/userdata/settings.json` as `providerInstances.kimi`. Official nightlies do not know the driver;
-they parse it as an open slug, show the provider as unavailable, and leave the config untouched, so
-switching between nightly and fork builds is safe.
+The Kimi CLI instance (`agentId: "kimi"`, `kimi acp`, auth method `login`) was an experiment and is no
+longer configured. Official nightlies do not know the driver; they parse it as an open slug, show the
+provider as unavailable, and leave the config untouched.
 
 ### Desktop builds and launcher
 
-The desktop launcher `~/Applications/t3code` is a symlink to the active AppImage in `~/Applications`.
-The official nightly updater rewrites that symlink on update. Local fork builds are produced and
-activated with `~/Applications/update-t3code.sh` (wraps `scripts/update-local-fork.sh`):
+Since 2026-10-05 the **official upstream T3 Code Nightly is the daily driver** on both of Henrik's
+machines (main PC and `t3-box`), not a fork build. The fork does not contain Orchestration V2
+(upstream PR #2829, merged 2026-10-02) and is no longer merged with upstream on a schedule.
 
-- `stage`: fetch/merge `upstream/main` on a throwaway candidate branch, run check/typecheck/tests,
-  build the AppImage, then fast-forward `main`. Aborts cleanly (main and launcher untouched) on merge
-  conflicts or failing gates. Requires a clean worktree on `main` and a local Node 24 runtime. If the
-  merged head matches the last staged commit, it exits early ("Bereits aktuell") without rebuilding.
-- `activate`: atomically points the launcher at the last staged, checksum-verified build.
-- There is intentionally no `rollback` command; switch to the nightly by re-pointing the symlink or
-  letting the nightly updater do it.
-- The fork build is the daily driver. A systemd user timer (`t3code-fork-update.timer`, nightly at
-  03:47, `Persistent=true`) runs `stage` followed by `activate`; check its runs with
-  `journalctl --user -u t3code-fork-update.service`.
+- Main PC: the desktop launcher `~/Applications/t3code` is a symlink to
+  `~/Applications/T3-Code-auto-current-x86_64.AppImage`, which the built-in nightly updater replaces;
+  `T3-Code-auto-previous-x86_64.AppImage` is the fallback. The app profile lives in
+  `~/.config/t3code-v2`; the old V1 profiles under `~/.config` are kept because V2 imports drafts and
+  stashed prompts from them.
+- `t3-box`: `t3-code-desktop.service` starts `~/Applications/t3-code`, which runs the same
+  `T3-Code-auto-current-x86_64.AppImage`. `t3-code-stage-nightly.timer` stages the latest verified
+  nightly every three hours; `t3-code-update-restart.service` is the Home Assistant update trigger.
+  `t3code-interactive-questions-guard.timer` only maintains a Codex `AGENTS.md` policy block and feature
+  flag and is unrelated to the fork.
+- `scripts/update-local-fork.sh` (`stage`/`activate`) still exists in the repo but is no longer wired
+  up: the `~/Applications/update-t3code.sh` wrapper and the `t3code-fork-update.timer` are gone. Fork
+  builds, the old `t3code.service` and stale runtime versions were removed on both machines.
 
 ## Local Environment
 
