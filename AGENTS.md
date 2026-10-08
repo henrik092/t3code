@@ -85,8 +85,16 @@ machines (main PC and `t3-box`), not a fork build. The fork does not contain Orc
 - `t3-box`: `t3-code-desktop.service` starts `~/Applications/t3-code`, which runs the same
   `T3-Code-auto-current-x86_64.AppImage`. `t3-code-stage-nightly.timer` stages the latest verified
   nightly every three hours; `t3-code-update-restart.service` is the Home Assistant update trigger.
-  `t3code-interactive-questions-guard.timer` only maintains a Codex `AGENTS.md` policy block and feature
-  flag and is unrelated to the fork.
+  The former `t3code-interactive-questions-guard.timer` was disabled on 2026-10-07 and its
+  `t3-code-stage-nightly.service` drop-in removed on 2026-10-08; agent-config now ships its policy
+  block and feature flag.
+- Agent setup on all machines comes from the private repo `henrik092/agent-config` (clone at
+  `~/agent-config`): shared instructions for `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, personal
+  skills, and shared Codex/Claude settings. `agent-config-sync.timer` applies it every three hours and
+  reports local drift via ntfy instead of overwriting it. Decisions and usage are in its README.
+- T3 Code shows a project from several machines as one sidebar entry only when every checkout is a Git
+  repository with the same normalized `origin` URL (without `origin`: `upstream`, else the
+  alphabetically first remote); plain folders stay separate per machine.
 - `scripts/update-local-fork.sh` (`stage`/`activate`) still exists in the repo but is no longer wired
   up: the `~/Applications/update-t3code.sh` wrapper and the `t3code-fork-update.timer` are gone. Fork
   builds, the old `t3code.service` and stale runtime versions were removed on both machines.
